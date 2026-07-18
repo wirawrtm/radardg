@@ -1,0 +1,47 @@
+                  <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
+                    <table className="w-full text-left border-collapse min-w-[500px]">
+                      <thead>
+                        <tr className="bg-[#fbfaff]">
+                          <th className="px-4 py-2 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9] sticky top-0 bg-[#fbfaff] z-10">Project No</th>
+                          <th className="px-4 py-2 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9] sticky top-0 bg-[#fbfaff] z-10">BS Name</th>
+                          <th className="px-4 py-2 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9] sticky top-0 bg-[#fbfaff] z-10">Activity</th>
+                          <th className="px-4 py-2 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9] sticky top-0 bg-[#fbfaff] z-10">Reach</th>
+                          <th className="px-4 py-2 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9] sticky top-0 bg-[#fbfaff] z-10">Hybrids</th>
+                          <th className="px-4 py-2 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9] text-right sticky top-0 bg-[#fbfaff] z-10">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#f1f5f9]">
+                        {generatedProjects.map((proj, idx) => (
+                          <tr key={proj.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="px-4 py-2.5">
+                              <span className="font-mono text-[10px] font-bold text-[#154be2] tracking-wider select-all">
+                                {proj.projectNo}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2.5 text-[10px] font-bold text-[#181a2c]">
+                              {proj.bs}
+                            </td>
+                            <td className="px-4 py-2.5 text-[10px] font-semibold text-[#8E94B7]">
+                              {proj.activity}
+                            </td>
+                            <td className="px-4 py-2.5 text-[10px] font-semibold text-[#8E94B7]">
+                              {proj.farmerReach}
+                            </td>
+                            <td className="px-4 py-2.5 text-[10px] font-semibold text-[#8E94B7] truncate max-w-[100px]">
+                              {proj.hybrids}
+                            </td>
+                            <td className="px-4 py-2.5 text-right">
+                              <button
+                                type="button"
+                                onClick={() => setGeneratedProjects(generatedProjects.filter((p) => p.id !== proj.id))}
+                                className="text-slate-400 hover:text-red-500 cursor-pointer transition-colors p-1 bg-white rounded shadow-sm border border-slate-200 hover:border-red-200 flex items-center justify-center ml-auto"
+                                title="Hapus dari antrean"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">delete</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>

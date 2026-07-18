@@ -1785,12 +1785,14 @@ const Dashboard = ({
 
   // Propose Activity States
   const [proposeBs, setProposeBs] = useState<string>("Lionel Messi");
-  const [proposeActivities, setProposeActivities] = useState<string[]>(["Farmer meeting"]);
-  const [proposeKecamatan, setProposeKecamatan] = useState<string>("Waru");
-  const [proposeBulan, setProposeBulan] = useState<string>("April");
-  const [proposeFarmerReach, setProposeFarmerReach] = useState<string>("");
-  const [proposeHybrids, setProposeHybrids] = useState<string[]>([]);
+  const [proposeCategory, setProposeCategory] = useState<string>("Regular");
+  const [proposeActivity, setProposeActivity] = useState<string>("Farmer meeting");
   const [generatedProjects, setGeneratedProjects] = useState<any[]>([]);
+  const [planningFilterDistrict, setPlanningFilterDistrict] = useState("");
+  const [planningFilterSubDistrict, setPlanningFilterSubDistrict] = useState("");
+  const [planningFilterMonth, setPlanningFilterMonth] = useState("");
+  const [planningStatusFilter, setPlanningStatusFilter] = useState("All");
+  const [processingRows, setProcessingRows] = useState<Record<string, boolean>>({});
   const [proposalsList, setProposalsList] = useState<any[]>(() => {
     try {
       const saved = localStorage.getItem("radar_dg_proposals");
@@ -13302,13 +13304,22 @@ const Dashboard = ({
       {activeTab === "propose" && (
         <div className="animate-in fade-in slide-in-from-right-4 duration-300">
           {/* Header */}
-          <div className="mb-6 ml-1 flex flex-col gap-1">
-            <h1 className="text-lg font-semibold text-[#181a2c] tracking-tight">
-              Propose Activity
-            </h1>
-            <p className="text-[#8E94B7] text-[11px] font-semibold tracking-wide">
-              Formulir pengajuan kegiatan promosi dan demo produk RADAR DG
-            </p>
+          <div className="mb-6 ml-1 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="size-10 rounded-2xl bg-gradient-to-br from-[#154be2]/20 to-cyan-400/20 flex items-center justify-center shrink-0 border border-[#154be2]/20 shadow-inner">
+                <span className="material-symbols-outlined text-[#154be2] text-[20px]">
+                  rate_review
+                </span>
+              </div>
+              <div>
+                <h1 className="text-lg font-bold text-[#181a2c] tracking-tight">
+                  Propose Activity
+                </h1>
+                <p className="text-[#8E94B7] text-[11px] font-semibold tracking-wide mt-0.5">
+                  Formulir pengajuan kegiatan promosi dan demo produk RADAR DG
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Success Notification */}
@@ -13358,240 +13369,222 @@ const Dashboard = ({
                 </div>
               </div>
 
-              {/* Activity Selector - MULTI SELECT SUPPORTED */}
+              {/* Activity Category */}
               <div>
                 <label className="block text-xs font-bold text-[#181a2c] mb-2.5 uppercase tracking-wider">
-                  Activity Type (Bisa Pilih Lebih Dari Satu)
+                  Activity Category
                 </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {["Farmer meeting", "FFM", "Mini expo"].map((act) => {
-                    const isSelected = proposeActivities.includes(act);
-                    let iconName = "groups";
-                    if (act === "FFM") iconName = "psychology";
-                    if (act === "Mini expo") iconName = "storefront";
+                <div className="flex bg-slate-100 p-1 rounded-xl">
+                  {["Regular", "AdHoc"].map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => {
+                        setProposeCategory(cat);
+                        setProposeActivity(cat === "Regular" ? "Farmer meeting" : "AIC");
+                      }}
+                      className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${proposeCategory === cat ? "bg-white text-[#154be2] shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Activity Type */}
+              <div>
+                <label className="block text-xs font-bold text-[#181a2c] mb-2.5 uppercase tracking-wider">
+                  Activity Type
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {(proposeCategory === "Regular" ? ["Farmer meeting", "Farmer field day", "One day promo", "Special field trip"] : ["AIC", "Expo", "Caravan", "Retailer Meeting"]).map((act) => {
+                    const isSelected = proposeActivity === act;
+                    const budgets: Record<string, {actual: number, remaining: number}> = {
+                      "Farmer meeting": { actual: 5000000, remaining: 12000000 },
+                      "Farmer field day": { actual: 8000000, remaining: 20000000 },
+                      "One day promo": { actual: 2000000, remaining: 5000000 },
+                      "Special field trip": { actual: 15000000, remaining: 35000000 },
+                      "AIC": { actual: 3000000, remaining: 10000000 },
+                      "Expo": { actual: 25000000, remaining: 50000000 },
+                      "Caravan": { actual: 10000000, remaining: 25000000 },
+                      "Retailer Meeting": { actual: 4000000, remaining: 8000000 },
+                    };
+                    const b = budgets[act] || { actual: 0, remaining: 0 };
+                    
                     return (
                       <button
                         key={act}
                         type="button"
-                        onClick={() => {
-                          if (isSelected) {
-                            if (proposeActivities.length > 1) {
-                              setProposeActivities(proposeActivities.filter((a) => a !== act));
-                            }
-                          } else {
-                            setProposeActivities([...proposeActivities, act]);
-                          }
-                        }}
-                        className={`flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all duration-200 cursor-pointer ${
+                        onClick={() => setProposeActivity(act)}
+                        className={`flex flex-col items-start p-3 rounded-xl border text-left transition-all duration-200 ${
                           isSelected
-                            ? "bg-[#154be2]/5 border-[#154be2] text-[#154be2] font-bold shadow-sm"
-                            : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                            ? "bg-[#154be2]/5 border-[#154be2] shadow-sm ring-1 ring-[#154be2]"
+                            : "border-slate-200 bg-white hover:bg-slate-50"
                         }`}
                       >
-                        <span className={`material-symbols-outlined text-[18px] mb-1 ${
-                          isSelected ? "text-[#154be2]" : "text-slate-400"
-                        }`}>
-                          {iconName}
-                        </span>
-                        <span className="text-[10px] sm:text-[11px] font-medium">{act}</span>
+                        <span className={`text-[10px] sm:text-[11px] font-bold mb-2 ${isSelected ? 'text-[#154be2]' : 'text-slate-700'}`}>{act}</span>
+                        <div className="mt-auto w-full">
+                          <div className="flex justify-between items-center text-[9px] mb-0.5">
+                            <span className="text-slate-400 font-medium">Actual:</span>
+                            <span className="font-semibold text-slate-700">Rp{(b.actual/1000000).toFixed(1)}M</span>
+                          </div>
+                          <div className="flex justify-between items-center text-[9px]">
+                            <span className="text-slate-400 font-medium">Remaining:</span>
+                            <span className="font-bold text-emerald-600">Rp{(b.remaining/1000000).toFixed(1)}M</span>
+                          </div>
+                        </div>
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              {/* Two-Column Selector: Kecamatan and Bulan */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Kecamatan */}
-                <div>
-                  <label className="block text-xs font-bold text-[#181a2c] mb-2 uppercase tracking-wider">
-                    Kecamatan
+              {/* Planning Data List */}
+              <div className="mt-6">
+                <div className="flex justify-between items-center mb-2.5">
+                  <label className="text-xs font-bold text-[#181a2c] uppercase tracking-wider">
+                    Planning Data
                   </label>
-                  <div className="relative">
-                    <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
-                      <span className="material-symbols-outlined text-[18px]">location_on</span>
-                    </span>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[10px] text-slate-500 font-semibold">Status:</span>
                     <select
-                      value={proposeKecamatan}
-                      onChange={(e) => setProposeKecamatan(e.target.value)}
-                      className="w-full bg-slate-50/50 hover:bg-slate-50 text-slate-800 text-xs font-semibold pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#154be2]/20 focus:border-[#154be2] transition-colors cursor-pointer appearance-none"
+                      value={planningStatusFilter}
+                      onChange={(e) => setPlanningStatusFilter(e.target.value)}
+                      className="text-[10px] font-bold border border-slate-200 rounded-lg text-slate-700 bg-white focus:outline-none focus:border-[#154be2] px-2 py-1 shadow-sm"
                     >
-                      <option value="Waru">Waru</option>
-                      <option value="Bangil">Bangil</option>
-                      <option value="Malang">Malang</option>
+                      <option value="All">All</option>
+                      <option value="Remaining">Remaining</option>
+                      <option value="Complete">Complete</option>
                     </select>
-                    <span className="absolute inset-y-0 right-0 flex items-center pr-3.5 pointer-events-none text-slate-400">
-                      <span className="material-symbols-outlined text-[16px]">expand_more</span>
-                    </span>
                   </div>
                 </div>
+                <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+                  <div className="overflow-x-auto">
+                    {(() => {
+                      const rawData = [
+                        { id: "L1", district: "Malang", subDistrict: "Waru", budget: 1500000, month: "Agustus", status: "Remaining" },
+                        { id: "L2", district: "Malang", subDistrict: "Singosari", budget: 2000000, month: "September", status: "Complete" },
+                        { id: "L3", district: "Pasuruan", subDistrict: "Bangil", budget: 1200000, month: "Oktober", status: "Remaining" },
+                        { id: "L4", district: "Pasuruan", subDistrict: "Pandaan", budget: 1800000, month: "Agustus", status: "Complete" },
+                        { id: "L5", district: "Batu", subDistrict: "Bumiaji", budget: 1500000, month: "November", status: "Remaining" },
+                      ];
+                      
+                      const uniqueDistricts = Array.from(new Set(rawData.map(r => r.district))).sort();
+                      const uniqueSubDistricts = Array.from(new Set(rawData.map(r => r.subDistrict))).sort();
+                      const uniqueMonths = Array.from(new Set(rawData.map(r => r.month))).sort();
+                      
+                      const filteredData = rawData.filter(row => 
+                        (planningFilterDistrict === "" || row.district === planningFilterDistrict) &&
+                        (planningFilterSubDistrict === "" || row.subDistrict === planningFilterSubDistrict) &&
+                        (planningFilterMonth === "" || row.month === planningFilterMonth) &&
+                        (planningStatusFilter === "All" || row.status === planningStatusFilter)
+                      );
 
-                {/* Bulan - EXPLICIT APRIL TO MARCH */}
-                <div>
-                  <label className="block text-xs font-bold text-[#181a2c] mb-2 uppercase tracking-wider">
-                    Bulan Pelaksanaan
-                  </label>
-                  <div className="relative">
-                    <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
-                      <span className="material-symbols-outlined text-[18px]">calendar_month</span>
-                    </span>
-                    <select
-                      value={proposeBulan}
-                      onChange={(e) => setProposeBulan(e.target.value)}
-                      className="w-full bg-slate-50/50 hover:bg-slate-50 text-slate-800 text-xs font-semibold pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#154be2]/20 focus:border-[#154be2] transition-colors cursor-pointer appearance-none"
-                    >
-                      {[
-                        "April",
-                        "Mei",
-                        "Juni",
-                        "Juli",
-                        "Agustus",
-                        "September",
-                        "Oktober",
-                        "November",
-                        "Desember",
-                        "Januari",
-                        "Februari",
-                        "Maret"
-                      ].map((m) => (
-                        <option key={m} value={m}>{m}</option>
-                      ))}
-                    </select>
-                    <span className="absolute inset-y-0 right-0 flex items-center pr-3.5 pointer-events-none text-slate-400">
-                      <span className="material-symbols-outlined text-[16px]">expand_more</span>
-                    </span>
+                      return (
+                        <table className="w-full text-left border-collapse min-w-[500px]">
+                          <thead>
+                            <tr className="bg-slate-50">
+                              <th className="px-3 py-2 text-[9px] font-extrabold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                                District
+                                <select value={planningFilterDistrict} onChange={e => setPlanningFilterDistrict(e.target.value)} className="mt-1 block w-full px-1.5 py-1 text-[9px] font-normal border border-slate-200 rounded text-slate-800 bg-white focus:outline-none focus:border-[#154be2]">
+                                  <option value="">All</option>
+                                  {uniqueDistricts.map(d => <option key={d} value={d}>{d}</option>)}
+                                </select>
+                              </th>
+                              <th className="px-3 py-2 text-[9px] font-extrabold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                                Sub District
+                                <select value={planningFilterSubDistrict} onChange={e => setPlanningFilterSubDistrict(e.target.value)} className="mt-1 block w-full px-1.5 py-1 text-[9px] font-normal border border-slate-200 rounded text-slate-800 bg-white focus:outline-none focus:border-[#154be2]">
+                                  <option value="">All</option>
+                                  {uniqueSubDistricts.map(d => <option key={d} value={d}>{d}</option>)}
+                                </select>
+                              </th>
+                              <th className="px-3 py-2 text-[9px] font-extrabold text-slate-500 uppercase tracking-wider border-b border-slate-200 align-top">Budget</th>
+                              <th className="px-3 py-2 text-[9px] font-extrabold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                                Month
+                                <select value={planningFilterMonth} onChange={e => setPlanningFilterMonth(e.target.value)} className="mt-1 block w-full px-1.5 py-1 text-[9px] font-normal border border-slate-200 rounded text-slate-800 bg-white focus:outline-none focus:border-[#154be2]">
+                                  <option value="">All</option>
+                                  {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
+                                </select>
+                              </th>
+                              <th className="px-3 py-2 text-[9px] font-extrabold text-slate-500 uppercase tracking-wider border-b border-slate-200 text-right align-top">Aksi</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {filteredData.map((row) => {
+                              const isComplete = row.status === "Complete";
+                              const isProcessing = processingRows[row.id];
+                              
+                              let btnClass = "bg-[#154be2] hover:bg-[#154be2]/90 text-white";
+                              let btnText = "Propose";
+                              let disabled = false;
+                              
+                              if (isComplete) {
+                                btnClass = "bg-slate-300 text-slate-500 cursor-not-allowed";
+                                disabled = true;
+                              } else if (isProcessing) {
+                                btnClass = "bg-yellow-400 text-yellow-900 cursor-not-allowed";
+                                btnText = "Process";
+                                disabled = true;
+                              }
+
+                              return (
+                                <tr key={row.id} className="hover:bg-slate-50/50 transition-colors">
+                                  <td className="px-3 py-2 text-[10px] font-bold text-slate-700">{row.district}</td>
+                                  <td className="px-3 py-2 text-[10px] font-semibold text-slate-600">{row.subDistrict}</td>
+                                  <td className="px-3 py-2 text-[10px] font-bold text-slate-800">Rp {row.budget.toLocaleString()}</td>
+                                  <td className="px-3 py-2 text-[10px] font-medium text-slate-500">{row.month}</td>
+                                  <td className="px-3 py-2 text-right">
+                                    <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-2">
+                                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${isComplete ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                                        {row.status}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        disabled={disabled}
+                                        onClick={() => {
+                                          setProcessingRows(prev => ({ ...prev, [row.id]: true }));
+                                          
+                                          const bsMap = { "Lionel Messi": "lm", "Ronaldo": "ro", "Mbappe": "mb", "Yamal": "ya" };
+                                          const actMap = { "Farmer meeting": "fm", "Farmer field day": "ffd", "One day promo": "odp", "Special field trip": "sft", "AIC": "aic", "Expo": "exp", "Caravan": "crv", "Retailer Meeting": "rm" };
+                                          const bsCode = bsMap[proposeBs as keyof typeof bsMap] || proposeBs.substring(0, 2).toLowerCase();
+                                          const actCode = actMap[proposeActivity as keyof typeof actMap] || "act";
+                                          const monthMap = { "Agustus": "08", "September": "09", "Oktober": "10", "November": "11" };
+                                          const monthCode = monthMap[row.month as keyof typeof monthMap] || "08";
+                                          const yearCode = "26";
+                                          const uniqueSuffix = String(Math.floor(Math.random() * 900) + 100);
+                                          const projectNo = `${bsCode}/${actCode}/${monthCode}/${yearCode}-${uniqueSuffix}`;
+                                          
+                                          const newProj = {
+                                            id: (Date.now() + Math.random()).toString(),
+                                            projectNo,
+                                            bs: proposeBs,
+                                            category: proposeCategory,
+                                            activity: proposeActivity,
+                                            district: row.district,
+                                            subDistrict: row.subDistrict,
+                                            budget: row.budget,
+                                            month: row.month,
+                                            farmerReach: "",
+                                            hybrids: "",
+                                          };
+                                          setGeneratedProjects((prev) => [...prev, newProj]);
+                                        }}
+                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all shadow-sm ${!disabled ? 'active:scale-95' : ''} ${btnClass}`}
+                                      >
+                                        {btnText}
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
-
-              {/* Farmer Reach */}
-              <div>
-                <label className="block text-xs font-bold text-[#181a2c] mb-2 uppercase tracking-wider">
-                  Farmer Reach (Estimasi Pengunjung)
-                </label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
-                    <span className="material-symbols-outlined text-[18px]">group</span>
-                  </span>
-                  <input
-                    type="number"
-                    value={proposeFarmerReach}
-                    onChange={(e) => setProposeFarmerReach(e.target.value)}
-                    placeholder="Masukkan estimasi jumlah pengunjung"
-                    className="w-full bg-slate-50/50 hover:bg-slate-50 text-slate-800 text-xs font-semibold pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#154be2]/20 focus:border-[#154be2] transition-colors"
-                  />
-                </div>
-                <p className="text-[9.5px] font-medium text-slate-400 mt-1.5 ml-1">
-                  Masukkan perkiraan jumlah petani yang akan menjangkau/menghadiri kegiatan ini.
-                </p>
-              </div>
-
-              {/* Hybrids Multi-Select */}
-              <div>
-                <label className="block text-xs font-bold text-[#181a2c] mb-2 uppercase tracking-wider">
-                  Hybrids Focus (Bisa Pilih Lebih Dari Satu)
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {["ADV JAGO", "ADV RUBY", "ADV JALU", "ADV GANESH"].map((hybrid) => {
-                    const isSelected = proposeHybrids.includes(hybrid);
-                    return (
-                      <button
-                        key={hybrid}
-                        type="button"
-                        onClick={() => {
-                          if (isSelected) {
-                            setProposeHybrids(proposeHybrids.filter((h) => h !== hybrid));
-                          } else {
-                            setProposeHybrids([...proposeHybrids, hybrid]);
-                          }
-                        }}
-                        className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition-all duration-200 cursor-pointer ${
-                          isSelected
-                            ? "bg-emerald-50/50 border-emerald-500 text-emerald-800 font-bold shadow-sm"
-                            : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                        }`}
-                      >
-                        <span className={`material-symbols-outlined text-[16px] flex-shrink-0 ${
-                          isSelected ? "text-emerald-600" : "text-slate-300"
-                        }`}>
-                          {isSelected ? "check_box" : "check_box_outline_blank"}
-                        </span>
-                        <span className="text-[11px] truncate">{hybrid}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Propose CTA */}
-              <button
-                type="button"
-                onClick={() => {
-                  const bsMap: Record<string, string> = {
-                    "Lionel Messi": "lm",
-                    "Ronaldo": "ro",
-                    "Mbappe": "mb",
-                    "Yamal": "ya",
-                  };
-                  const actMap: Record<string, string> = {
-                    "Farmer meeting": "fm",
-                    "FFM": "ff",
-                    "Mini expo": "me",
-                  };
-                  const monthMap: Record<string, string> = {
-                    "Januari": "01",
-                    "Februari": "02",
-                    "Maret": "03",
-                    "April": "04",
-                    "Mei": "05",
-                    "Juni": "06",
-                    "Juli": "07",
-                    "Agustus": "08",
-                    "September": "09",
-                    "Oktober": "10",
-                    "November": "11",
-                    "Desember": "12"
-                  };
-
-                  const getBsCode = (name: string): string => {
-                    const mapped = bsMap[name];
-                    if (mapped) return mapped;
-                    const words = name.trim().split(/\s+/);
-                    if (words.length === 1) {
-                      return words[0].substring(0, 2).toLowerCase();
-                    }
-                    return words.map(w => w[0]).join("").toLowerCase();
-                  };
-
-                  const newGenerated: any[] = [];
-                  proposeActivities.forEach((act) => {
-                    const bsCode = getBsCode(proposeBs);
-                    const actCode = actMap[act] || "fm";
-                    const monthCode = monthMap[proposeBulan] || "04";
-                    const yearCode = "26";
-
-                    const projectNo = `${bsCode}/${actCode}/${monthCode}/${yearCode}`;
-
-                    newGenerated.push({
-                      id: (Date.now() + Math.random()).toString(),
-                      projectNo,
-                      bs: proposeBs,
-                      activity: act,
-                      kecamatan: proposeKecamatan,
-                      bulan: proposeBulan,
-                      farmerReach: proposeFarmerReach || "0",
-                      hybrids: proposeHybrids.join(", ") || "None",
-                    });
-                  });
-
-                  setGeneratedProjects((prev) => [...prev, ...newGenerated]);
-                  setProposalSuccessMsg("");
-                }}
-                className="w-full flex items-center justify-center gap-2.5 bg-gradient-to-r from-[#154be2] to-[#3b82f6] hover:from-[#154be2]/95 hover:to-[#3b82f6]/95 text-white py-3 rounded-xl font-bold text-xs transition-all shadow-sm active:scale-98 cursor-pointer mt-2"
-              >
-                <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
-                Propose Activity
-              </button>
             </div>
 
             {/* Right Panel: Output & Submission Card */}
@@ -13609,31 +13602,58 @@ const Dashboard = ({
                   </div>
 
                   {/* List of Generated Projects */}
-                  <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
-                    {generatedProjects.map((proj, idx) => (
-                      <div key={proj.id} className="bg-slate-50 border border-dashed border-[#154be2]/20 rounded-xl p-3.5 relative overflow-hidden group">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setGeneratedProjects(generatedProjects.filter((p) => p.id !== proj.id));
-                          }}
-                          className="absolute top-2 right-2 text-slate-400 hover:text-red-500 cursor-pointer transition-colors"
-                          title="Hapus dari antrean"
-                        >
-                          <span className="material-symbols-outlined text-[16px]">close</span>
-                        </button>
-                        <span className="font-mono text-base font-bold text-[#154be2] tracking-wider select-all block mb-1">
-                          {proj.projectNo}
-                        </span>
-                        <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[9.5px] text-[#8E94B7] font-semibold">
-                          <div>BS: <span className="text-[#181a2c]">{proj.bs}</span></div>
-                          <div>Activity: <span className="text-[#181a2c]">{proj.activity}</span></div>
-                          <div>Kec: <span className="text-[#181a2c]">{proj.kecamatan}</span></div>
-                          <div>Bulan: <span className="text-[#181a2c]">{proj.bulan}</span></div>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
+                    <table className="w-full text-left border-collapse min-w-[500px]">
+                      <thead>
+                        <tr className="bg-[#fbfaff]">
+                          <th className="px-4 py-2 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9] sticky top-0 bg-[#fbfaff] z-10">Project No</th>
+                          <th className="px-4 py-2 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9] sticky top-0 bg-[#fbfaff] z-10">BS Name</th>
+                          <th className="px-4 py-2 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9] sticky top-0 bg-[#fbfaff] z-10">Activity</th>
+                          <th className="px-4 py-2 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9] sticky top-0 bg-[#fbfaff] z-10">Location</th>
+                          <th className="px-4 py-2 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9] sticky top-0 bg-[#fbfaff] z-10">Budget</th>
+                          <th className="px-4 py-2 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9] sticky top-0 bg-[#fbfaff] z-10">Month</th>
+                          <th className="px-4 py-2 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9] text-right sticky top-0 bg-[#fbfaff] z-10">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#f1f5f9]">
+                        {generatedProjects.map((proj, idx) => (
+                          <tr key={proj.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="px-4 py-2.5">
+                              <span className="font-mono text-[10px] font-bold text-[#154be2] tracking-wider select-all">
+                                {proj.projectNo}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2.5 text-[10px] font-bold text-[#181a2c]">
+                              {proj.bs}
+                            </td>
+                            <td className="px-4 py-2.5 text-[10px] font-semibold text-[#8E94B7]">
+                              {proj.activity}
+                            </td>
+                            <td className="px-4 py-2.5 text-[10px] font-semibold text-[#8E94B7]">
+                              {proj.district}, {proj.subDistrict}
+                            </td>
+                            <td className="px-4 py-2.5 text-[10px] font-semibold text-[#8E94B7]">
+                              Rp {proj.budget?.toLocaleString()}
+                            </td>
+                            <td className="px-4 py-2.5 text-[10px] font-semibold text-[#8E94B7]">
+                              {proj.month}
+                            </td>
+                            <td className="px-4 py-2.5 text-right">
+                              <button
+                                type="button"
+                                onClick={() => setGeneratedProjects(generatedProjects.filter((p) => p.id !== proj.id))}
+                                className="text-slate-400 hover:text-red-500 cursor-pointer transition-colors p-1 bg-white rounded shadow-sm border border-slate-200 hover:border-red-200 flex items-center justify-center ml-auto"
+                                title="Hapus dari antrean"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">delete</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
+
 
                   {/* Submit CTA */}
                   <button
@@ -13731,10 +13751,9 @@ const Dashboard = ({
                     <th className="px-5 py-3 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9]">Project No</th>
                     <th className="px-5 py-3 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9]">BS Name</th>
                     <th className="px-5 py-3 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9]">Activity</th>
-                    <th className="px-5 py-3 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9]">Kecamatan</th>
-                    <th className="px-5 py-3 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9]">Bulan</th>
-                    <th className="px-5 py-3 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9]">Reach</th>
-                    <th className="px-5 py-3 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9]">Hybrids</th>
+                    <th className="px-5 py-3 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9]">Location</th>
+                    <th className="px-5 py-3 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9]">Budget</th>
+                    <th className="px-5 py-3 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9]">Month</th>
                     <th className="px-5 py-3 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9]">Submitted At</th>
                     <th className="px-5 py-3 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9] text-right">Aksi</th>
                   </tr>
@@ -13765,17 +13784,14 @@ const Dashboard = ({
                           <td className="px-5 py-3.5 text-xs font-semibold text-[#181a2c]">
                             {proposal.activity}
                           </td>
-                          <td className="px-5 py-3.5 text-xs font-medium text-slate-600">
-                            {proposal.kecamatan}
-                          </td>
-                          <td className="px-5 py-3.5 text-xs font-medium text-slate-600">
-                            {proposal.bulan}
-                          </td>
                           <td className="px-5 py-3.5 text-xs font-bold text-slate-700">
-                            {proposal.farmerReach ? Number(proposal.farmerReach).toLocaleString() : "0"} org
+                            {proposal.district}, {proposal.subDistrict}
                           </td>
-                          <td className="px-5 py-3.5 text-xs font-medium text-slate-500 max-w-[150px] truncate" title={proposal.hybrids}>
-                            {proposal.hybrids}
+                          <td className="px-5 py-3.5 text-xs font-medium text-slate-700">
+                            Rp {proposal.budget?.toLocaleString()}
+                          </td>
+                          <td className="px-5 py-3.5 text-xs font-medium text-slate-500">
+                            {proposal.month}
                           </td>
                           <td className="px-5 py-3.5 text-[10px] font-semibold text-slate-400">
                             {proposal.createdAt}
@@ -13800,7 +13816,7 @@ const Dashboard = ({
                         {/* DRILL DOWN EXPANDABLE DETAIL VIEW */}
                         {expandedProposalId === proposal.id && (
                           <tr className="bg-slate-50/40">
-                            <td colSpan={9} className="px-6 py-4 border-b border-[#f1f5f9]">
+                            <td colSpan={8} className="px-6 py-4 border-b border-[#f1f5f9]">
                               <div className="bg-white p-5 rounded-2xl border border-[#154be2]/10 shadow-[0_4px_24px_rgba(21,75,226,0.02)] grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-top-1.5 duration-250">
                                 <div>
                                   <h4 className="text-[10px] font-bold text-[#154be2] uppercase tracking-wider mb-2.5 flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
@@ -13829,10 +13845,7 @@ const Dashboard = ({
                                     Wilayah & Waktu
                                   </h4>
                                   <div className="space-y-1.5 text-xs">
-                                    <div className="flex justify-between">
-                                      <span className="text-[#8E94B7] font-semibold">Kecamatan:</span>
-                                      <span className="font-bold text-[#181a2c]">{proposal.kecamatan}</span>
-                                    </div>
+
                                     <div className="flex justify-between">
                                       <span className="text-[#8E94B7] font-semibold">Bulan Pelaksanaan:</span>
                                       <span className="font-bold text-[#181a2c]">{proposal.bulan}</span>
@@ -13874,7 +13887,7 @@ const Dashboard = ({
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={9} className="px-5 py-12 text-center text-[#8E94B7] font-semibold text-xs">
+                      <td colSpan={8} className="px-5 py-12 text-center text-[#8E94B7] font-semibold text-xs">
                         Belum ada project yang disubmit. Silakan propose kegiatan di atas.
                       </td>
                     </tr>

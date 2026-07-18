@@ -1,0 +1,81 @@
+ 12280	                            <input type="text" placeholder="Filter..." value={planningFilterDistrict} onChange={e => setPlanningFilterDistrict(e.target.value)} className="mt-1 block w-full px-1.5 py-1 text-[9px] font-normal border border-slate-200 rounded text-slate-800 placeholder-slate-300 focus:outline-none focus:border-[#154be2]" />
+ 12281	                          </th>
+ 12282	                          <th className="px-3 py-2 text-[9px] font-extrabold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+ 12283	                            Sub District
+ 12284	                            <input type="text" placeholder="Filter..." value={planningFilterSubDistrict} onChange={e => setPlanningFilterSubDistrict(e.target.value)} className="mt-1 block w-full px-1.5 py-1 text-[9px] font-normal border border-slate-200 rounded text-slate-800 placeholder-slate-300 focus:outline-none focus:border-[#154be2]" />
+ 12285	                          </th>
+ 12286	                          <th className="px-3 py-2 text-[9px] font-extrabold text-slate-500 uppercase tracking-wider border-b border-slate-200 align-top">Budget</th>
+ 12287	                          <th className="px-3 py-2 text-[9px] font-extrabold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+ 12288	                            Month
+ 12289	                            <input type="text" placeholder="Filter..." value={planningFilterMonth} onChange={e => setPlanningFilterMonth(e.target.value)} className="mt-1 block w-full px-1.5 py-1 text-[9px] font-normal border border-slate-200 rounded text-slate-800 placeholder-slate-300 focus:outline-none focus:border-[#154be2]" />
+ 12290	                          </th>
+ 12291	                          <th className="px-3 py-2 text-[9px] font-extrabold text-slate-500 uppercase tracking-wider border-b border-slate-200 text-right align-top">Aksi</th>
+ 12292	                        </tr>
+ 12293	                      </thead>
+ 12294	                      <tbody className="divide-y divide-slate-100">
+ 12295	                        {[
+ 12296	                          { id: "L1", district: "Malang", subDistrict: "Waru", budget: 1500000, month: "Agustus" },
+ 12297	                          { id: "L2", district: "Malang", subDistrict: "Singosari", budget: 2000000, month: "September" },
+ 12298	                          { id: "L3", district: "Pasuruan", subDistrict: "Bangil", budget: 1200000, month: "Oktober" },
+ 12299	                          { id: "L4", district: "Pasuruan", subDistrict: "Pandaan", budget: 1800000, month: "Agustus" },
+ 12300	                          { id: "L5", district: "Batu", subDistrict: "Bumiaji", budget: 1500000, month: "November" },
+ 12301	                        ].filter(row => 
+ 12302	                          (planningFilterDistrict === "" || row.district.toLowerCase().includes(planningFilterDistrict.toLowerCase())) &&
+ 12303	                          (planningFilterSubDistrict === "" || row.subDistrict.toLowerCase().includes(planningFilterSubDistrict.toLowerCase())) &&
+ 12304	                          (planningFilterMonth === "" || row.month.toLowerCase().includes(planningFilterMonth.toLowerCase()))
+ 12305	                        ).map((row) => (
+ 12306	                          <tr key={row.id} className="hover:bg-slate-50/50 transition-colors">
+ 12307	                            <td className="px-3 py-2 text-[10px] font-bold text-slate-700">{row.district}</td>
+ 12308	                            <td className="px-3 py-2 text-[10px] font-semibold text-slate-600">{row.subDistrict}</td>
+ 12309	                            <td className="px-3 py-2 text-[10px] font-bold text-slate-800">Rp {row.budget.toLocaleString()}</td>
+ 12310	                            <td className="px-3 py-2 text-[10px] font-medium text-slate-500">{row.month}</td>
+ 12311	                            <td className="px-3 py-2 text-right">
+ 12312	                              <button
+ 12313	                                type="button"
+ 12314	                                onClick={() => {
+ 12315	                                  const bsMap: Record<string, string> = { "Lionel Messi": "lm", "Ronaldo": "ro", "Mbappe": "mb", "Yamal": "ya" };
+ 12316	                                  const actMap: Record<string, string> = { "Farmer meeting": "fm", "Farmer field day": "ffd", "One day promo": "odp", "Special field trip": "sft", "AIC": "aic", "Expo": "exp", "Caravan": "crv", "Retailer Meeting": "rm" };
+ 12317	                                  const bsCode = bsMap[proposeBs] || proposeBs.substring(0, 2).toLowerCase();
+ 12318	                                  const actCode = actMap[proposeActivity] || "act";
+ 12319	                                  const monthMap: Record<string, string> = { "Agustus": "08", "September": "09", "Oktober": "10", "November": "11" };
+ 12320	                                  const monthCode = monthMap[row.month] || "08";
+ 12321	                                  const yearCode = "26";
+ 12322	                                  const uniqueSuffix = String(Math.floor(Math.random() * 900) + 100);
+ 12323	                                  const projectNo = `${bsCode}/${actCode}/${monthCode}/${yearCode}-${uniqueSuffix}`;
+ 12324	                                  
+ 12325	                                  const newProj = {
+ 12326	                                    id: (Date.now() + Math.random()).toString(),
+ 12327	                                    projectNo,
+ 12328	                                    bs: proposeBs,
+ 12329	                                    category: proposeCategory,
+ 12330	                                    activity: proposeActivity,
+ 12331	                                    district: row.district,
+ 12332	                                    subDistrict: row.subDistrict,
+ 12333	                                    budget: row.budget,
+ 12334	                                    month: row.month,
+ 12335	                                  };
+ 12336	                                  setGeneratedProjects((prev) => [...prev, newProj]);
+ 12337	                                }}
+ 12338	                                className="bg-[#154be2] hover:bg-[#154be2]/90 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all shadow-sm active:scale-95"
+ 12339	                              >
+ 12340	                                Propose
+ 12341	                              </button>
+ 12342	                            </td>
+ 12343	                          </tr>
+ 12344	                        ))}
+ 12345	                      </tbody>
+ 12346	                    </table>
+ 12347	                  </div>
+ 12348	                </div>
+ 12349	              </div>
+ 12350	            </div>
+ 12351	            {/* Right Panel: Output & Submission Card */}
+ 12352	            <div className="lg:col-span-5 h-full space-y-4">
+ 12353	              {generatedProjects.length > 0 ? (
+ 12354	                <div className="bg-white rounded-[24px] shadow-[0_12px_32px_rgba(21,75,226,0.12)] border border-[#154be2]/5 p-6 space-y-6 animate-in fade-in zoom-in-95 duration-300">
+ 12355	                  <div className="flex flex-col items-center text-center">
+ 12356	                    <div className="size-12 rounded-full bg-[#154be2]/10 flex items-center justify-center text-[#154be2] mb-3">
+ 12357	                      <span className="material-symbols-outlined text-[24px]">qr_code_2</span>
+ 12358	                    </div>
+ 12359	                    <h3 className="text-sm font-bold text-[#181a2c]">Generated Project Numbers</h3>
+ 12360	                    <p className="text-[10px] font-semibold text-[#8E94B7] mt-0.5">

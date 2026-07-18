@@ -1,0 +1,20 @@
+const newGenerated: any[] = [];
+Object.entries(proposeActivities).forEach(([act, count]) => {
+  for (let i = 0; i < count; i++) {
+    const bsCode = getBsCode(proposeBs);
+    const actCode = actMap[act] || "fm";
+    const d = new Date();
+    const monthCode = String(d.getMonth() + 1).padStart(2, '0');
+    const yearCode = String(d.getFullYear()).slice(-2);
+    const uniqueSuffix = String(Math.floor(Math.random() * 900) + 100);
+    const projectNo = `${bsCode}/${actCode}/${monthCode}/${yearCode}-${uniqueSuffix}`;
+    newGenerated.push({
+      id: (Date.now() + Math.random()).toString(),
+      projectNo,
+      bs: proposeBs,
+      activity: act,
+      farmerReach: proposeFarmerReach || "0",
+      hybrids: proposeHybrids.join(", ") || "None",
+    });
+  }
+});
