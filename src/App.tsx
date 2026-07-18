@@ -10,6 +10,8 @@ import { AdvantaLogo } from "./AdvantaLogo";
 import { UserIcon } from "./UserIcon";
 import { User } from "lucide-react";
 import * as XLSX from "xlsx";
+import { jsPDF } from "jspdf";
+import "jspdf-autotable";
 import {
   ResponsiveContainer,
   BarChart,
@@ -1791,7 +1793,8 @@ const Dashboard = ({
   const [planningFilterDistrict, setPlanningFilterDistrict] = useState("");
   const [planningFilterSubDistrict, setPlanningFilterSubDistrict] = useState("");
   const [planningFilterMonth, setPlanningFilterMonth] = useState("");
-  const [planningStatusFilter, setPlanningStatusFilter] = useState("All");
+  const [planningStatusFilter, setPlanningStatusFilter] = useState("Remaining");
+  const [proposalSubmitAttempted, setProposalSubmitAttempted] = useState<boolean>(false);
   const [processingRows, setProcessingRows] = useState<Record<string, boolean>>({});
   const [proposalsList, setProposalsList] = useState<any[]>(() => {
     try {
@@ -1803,7 +1806,122 @@ const Dashboard = ({
   });
   const [isSubmittingProposal, setIsSubmittingProposal] = useState<boolean>(false);
   const [proposalSuccessMsg, setProposalSuccessMsg] = useState<string>("");
+  const [proposalAlert, setProposalAlert] = useState<{ message: string; type: "error" | "warning" } | null>(null);
   const [expandedProposalId, setExpandedProposalId] = useState<string | null>(null);
+  const [isPreviewPdfModalOpen, setIsPreviewPdfModalOpen] = useState<boolean>(false);
+
+  const handleDownloadPdf = () => {
+    try {
+      const doc = new jsPDF();
+      
+      // Title Section
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.setTextColor(21, 75, 226); // Primary Color (#154be2)
+      doc.text("LAPORAN PENGAJUAN KEGIATAN (PROPOSAL SUBMIT)", 14, 20);
+      
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(100, 116, 139); // Gray
+      const currentDateStr = new Date().toLocaleDateString("id-ID", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+      doc.text(`Dicetak pada: ${currentDateStr}`, 14, 26);
+      doc.text(`Sistem: RADAR DG (Digital Generation)`, 14, 31);
+      
+      // Draw a line
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.5);
+      doc.line(14, 34, 196, 34);
+      
+      // Table data
+      const tableColumn = ["Project No", "BS Name", "Jenis Kegiatan", "Wilayah", "Farmers", "Varietas", "Anggaran (IDR)", "Bulan"];
+      const tableRows = proposalsList.map((p) => [
+        p.projectNo || "-",
+        p.bs || "-",
+        p.activity || "-",
+        `${p.district || "-"}, ${p.subDistrict || "-"}`,
+        p.farmerReach ? Number(p.farmerReach).toLocaleString("id-ID") : "0",
+        p.hybrids || "-",
+        p.budget ? `Rp ${Number(p.budget).toLocaleString("id-ID")}` : "Rp 0",
+        p.month || "-"
+      ]);
+      
+      // Generate table
+      (doc as any).autoTable({
+        head: [tableColumn],
+        body: tableRows,
+        startY: 38,
+        theme: "striped",
+        headStyles: {
+          fillColor: [21, 75, 226], // Primary Color
+          textColor: [255, 255, 255],
+          fontSize: 8,
+          fontStyle: "bold",
+          halign: "center",
+          valign: "middle"
+        },
+        bodyStyles: {
+          fontSize: 7.5,
+          textColor: [51, 65, 85]
+        },
+        columnStyles: {
+          0: { cellWidth: 25 }, // Project No
+          1: { cellWidth: 20 }, // BS Name
+          2: { cellWidth: 25 }, // Activity
+          3: { cellWidth: 35 }, // Location
+          4: { cellWidth: 15, halign: "center" }, // Farmers
+          5: { cellWidth: 25 }, // Hybrids
+          6: { cellWidth: 23, halign: "right" }, // Budget
+          7: { cellWidth: 14, halign: "center" }  // Month
+        },
+        margin: { top: 38, left: 14, right: 14 }
+      });
+      
+      // Adding Signature Lines
+      const finalY = (doc as any).lastAutoTable.finalY || 100;
+      if (finalY + 45 > 280) {
+        doc.addPage();
+        // Reset finalY on new page
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        doc.setTextColor(51, 65, 85);
+        
+        doc.text("Diajukan Oleh,", 25, 30);
+        doc.text("Business Specialist", 25, 35);
+        doc.line(25, 60, 75, 60);
+        
+        doc.text("Disetujui Oleh,", 135, 30);
+        doc.text("Management / Lead", 135, 35);
+        doc.line(135, 60, 185, 60);
+      } else {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        doc.setTextColor(51, 65, 85);
+        
+        doc.text("Diajukan Oleh,", 25, finalY + 15);
+        doc.text("Business Specialist", 25, finalY + 20);
+        doc.line(25, finalY + 45, 75, finalY + 45);
+        
+        doc.text("Disetujui Oleh,", 135, finalY + 15);
+        doc.text("Management / Lead", 135, finalY + 20);
+        doc.line(135, finalY + 45, 185, finalY + 45);
+      }
+      
+      // Save the PDF
+      const fileName = `Laporan_Pengajuan_Proyek_Radar_DG_${new Date().toISOString().slice(0, 10)}.pdf`;
+      doc.save(fileName);
+      setIsPreviewPdfModalOpen(false);
+    } catch (error) {
+      console.error("Gagal mengekspor PDF:", error);
+      alert("Terjadi kesalahan saat mengekspor PDF.");
+    }
+  };
 
   const bsEmployeesList = useMemo(() => {
     if (!employees || employees.length === 0) {
@@ -13441,21 +13559,38 @@ const Dashboard = ({
 
               {/* Planning Data List */}
               <div className="mt-6">
-                <div className="flex justify-between items-center mb-2.5">
-                  <label className="text-xs font-bold text-[#181a2c] uppercase tracking-wider">
-                    Planning Data
-                  </label>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-[10px] text-slate-500 font-semibold">Status:</span>
-                    <select
-                      value={planningStatusFilter}
-                      onChange={(e) => setPlanningStatusFilter(e.target.value)}
-                      className="text-[10px] font-bold border border-slate-200 rounded-lg text-slate-700 bg-white focus:outline-none focus:border-[#154be2] px-2 py-1 shadow-sm"
-                    >
-                      <option value="All">All</option>
-                      <option value="Remaining">Remaining</option>
-                      <option value="Complete">Complete</option>
-                    </select>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[#154be2] text-[18px]">
+                      assignment
+                    </span>
+                    <label className="text-xs font-extrabold text-[#181a2c] uppercase tracking-wider">
+                      Planning Data
+                    </label>
+                  </div>
+                  
+                  {/* Button Picklist status filter */}
+                  <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200/60 shadow-inner self-start sm:self-auto">
+                    {[
+                      { value: "Remaining", label: "Remaining" },
+                      { value: "Complete", label: "Complete" }
+                    ].map((opt) => {
+                      const isActive = planningStatusFilter === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setPlanningStatusFilter(opt.value)}
+                          className={`px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all duration-200 cursor-pointer ${
+                            isActive
+                              ? "bg-gradient-to-r from-[#154be2] to-cyan-500 text-white shadow-sm"
+                              : "text-slate-500 hover:text-slate-800"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
                 <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
@@ -13483,30 +13618,42 @@ const Dashboard = ({
                       return (
                         <table className="w-full text-left border-collapse min-w-[500px]">
                           <thead>
-                            <tr className="bg-slate-50">
-                              <th className="px-3 py-2 text-[9px] font-extrabold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                            <tr className="bg-gradient-to-r from-[#154be2]/10 to-indigo-50/40 border-b border-[#154be2]/15">
+                              <th className="px-3 py-2.5 text-[10px] font-extrabold text-[#154be2] uppercase tracking-wider">
                                 District
-                                <select value={planningFilterDistrict} onChange={e => setPlanningFilterDistrict(e.target.value)} className="mt-1 block w-full px-1.5 py-1 text-[9px] font-normal border border-slate-200 rounded text-slate-800 bg-white focus:outline-none focus:border-[#154be2]">
+                                <select 
+                                  value={planningFilterDistrict} 
+                                  onChange={e => setPlanningFilterDistrict(e.target.value)} 
+                                  className="mt-1.5 block w-full px-2.5 py-1 text-[9px] font-bold border border-[#154be2]/20 rounded-full text-[#154be2] bg-white hover:bg-indigo-50/30 transition-all focus:outline-none focus:ring-1 focus:ring-[#154be2] focus:border-[#154be2] cursor-pointer shadow-sm"
+                                >
                                   <option value="">All</option>
                                   {uniqueDistricts.map(d => <option key={d} value={d}>{d}</option>)}
                                 </select>
                               </th>
-                              <th className="px-3 py-2 text-[9px] font-extrabold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                              <th className="px-3 py-2.5 text-[10px] font-extrabold text-[#154be2] uppercase tracking-wider">
                                 Sub District
-                                <select value={planningFilterSubDistrict} onChange={e => setPlanningFilterSubDistrict(e.target.value)} className="mt-1 block w-full px-1.5 py-1 text-[9px] font-normal border border-slate-200 rounded text-slate-800 bg-white focus:outline-none focus:border-[#154be2]">
+                                <select 
+                                  value={planningFilterSubDistrict} 
+                                  onChange={e => setPlanningFilterSubDistrict(e.target.value)} 
+                                  className="mt-1.5 block w-full px-2.5 py-1 text-[9px] font-bold border border-[#154be2]/20 rounded-full text-[#154be2] bg-white hover:bg-indigo-50/30 transition-all focus:outline-none focus:ring-1 focus:ring-[#154be2] focus:border-[#154be2] cursor-pointer shadow-sm"
+                                >
                                   <option value="">All</option>
                                   {uniqueSubDistricts.map(d => <option key={d} value={d}>{d}</option>)}
                                 </select>
                               </th>
-                              <th className="px-3 py-2 text-[9px] font-extrabold text-slate-500 uppercase tracking-wider border-b border-slate-200 align-top">Budget</th>
-                              <th className="px-3 py-2 text-[9px] font-extrabold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                              <th className="px-3 py-2.5 text-[10px] font-extrabold text-[#154be2] uppercase tracking-wider align-top">Budget</th>
+                              <th className="px-3 py-2.5 text-[10px] font-extrabold text-[#154be2] uppercase tracking-wider">
                                 Month
-                                <select value={planningFilterMonth} onChange={e => setPlanningFilterMonth(e.target.value)} className="mt-1 block w-full px-1.5 py-1 text-[9px] font-normal border border-slate-200 rounded text-slate-800 bg-white focus:outline-none focus:border-[#154be2]">
+                                <select 
+                                  value={planningFilterMonth} 
+                                  onChange={e => setPlanningFilterMonth(e.target.value)} 
+                                  className="mt-1.5 block w-full px-2.5 py-1 text-[9px] font-bold border border-[#154be2]/20 rounded-full text-[#154be2] bg-white hover:bg-indigo-50/30 transition-all focus:outline-none focus:ring-1 focus:ring-[#154be2] focus:border-[#154be2] cursor-pointer shadow-sm"
+                                >
                                   <option value="">All</option>
                                   {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
                                 </select>
                               </th>
-                              <th className="px-3 py-2 text-[9px] font-extrabold text-slate-500 uppercase tracking-wider border-b border-slate-200 text-right align-top">Aksi</th>
+                              <th className="px-3 py-2.5 text-[10px] font-extrabold text-[#154be2] uppercase tracking-wider text-right align-top">Aksi</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
@@ -13519,10 +13666,11 @@ const Dashboard = ({
                               let disabled = false;
                               
                               if (isComplete) {
-                                btnClass = "bg-slate-300 text-slate-500 cursor-not-allowed";
+                                btnClass = "bg-slate-200 text-slate-500 border border-slate-300 cursor-not-allowed";
+                                btnText = row.month;
                                 disabled = true;
                               } else if (isProcessing) {
-                                btnClass = "bg-yellow-400 text-yellow-900 cursor-not-allowed";
+                                btnClass = "bg-yellow-400 text-yellow-950 border border-yellow-500 cursor-not-allowed font-bold";
                                 btnText = "Process";
                                 disabled = true;
                               }
@@ -13534,14 +13682,33 @@ const Dashboard = ({
                                   <td className="px-3 py-2 text-[10px] font-bold text-slate-800">Rp {row.budget.toLocaleString()}</td>
                                   <td className="px-3 py-2 text-[10px] font-medium text-slate-500">{row.month}</td>
                                   <td className="px-3 py-2 text-right">
-                                    <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-2">
-                                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${isComplete ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
-                                        {row.status}
-                                      </span>
+                                    <div className="flex justify-end">
                                       <button
                                         type="button"
                                         disabled={disabled}
                                         onClick={() => {
+                                          const monthMapIndo: Record<string, number> = {
+                                            "januari": 0, "februari": 1, "maret": 2, "april": 3, "mei": 4, "juni": 5,
+                                            "juli": 6, "agustus": 7, "september": 8, "oktober": 9, "november": 10, "desember": 11
+                                          };
+                                          const cleanedMonthStr = String(row.month).toLowerCase();
+                                          let targetMonthIdx = 7;
+                                          for (const [key, idx] of Object.entries(monthMapIndo)) {
+                                            if (cleanedMonthStr.includes(key)) {
+                                              targetMonthIdx = idx;
+                                              break;
+                                            }
+                                          }
+                                          const currentMonthIdx = new Date().getMonth();
+                                          const monthDiff = Math.abs(currentMonthIdx - targetMonthIdx);
+                                          if (monthDiff >= 3) {
+                                            setProposalAlert({
+                                              message: "bulan terlalu lama, ajukan approval",
+                                              type: "warning"
+                                            });
+                                            return;
+                                          }
+
                                           setProcessingRows(prev => ({ ...prev, [row.id]: true }));
                                           
                                           const bsMap = { "Lionel Messi": "lm", "Ronaldo": "ro", "Mbappe": "mb", "Yamal": "ya" };
@@ -13556,6 +13723,7 @@ const Dashboard = ({
                                           
                                           const newProj = {
                                             id: (Date.now() + Math.random()).toString(),
+                                            rowId: row.id,
                                             projectNo,
                                             bs: proposeBs,
                                             category: proposeCategory,
@@ -13564,8 +13732,9 @@ const Dashboard = ({
                                             subDistrict: row.subDistrict,
                                             budget: row.budget,
                                             month: row.month,
+                                            bulan: row.month,
                                             farmerReach: "",
-                                            hybrids: "",
+                                            hybrids: "ADV JAGO",
                                           };
                                           setGeneratedProjects((prev) => [...prev, newProj]);
                                         }}
@@ -13603,7 +13772,7 @@ const Dashboard = ({
 
                   {/* List of Generated Projects */}
                   <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
-                    <table className="w-full text-left border-collapse min-w-[500px]">
+                    <table className="w-full text-left border-collapse min-w-[700px]">
                       <thead>
                         <tr className="bg-[#fbfaff]">
                           <th className="px-4 py-2 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9] sticky top-0 bg-[#fbfaff] z-10">Project No</th>
@@ -13612,6 +13781,8 @@ const Dashboard = ({
                           <th className="px-4 py-2 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9] sticky top-0 bg-[#fbfaff] z-10">Location</th>
                           <th className="px-4 py-2 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9] sticky top-0 bg-[#fbfaff] z-10">Budget</th>
                           <th className="px-4 py-2 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9] sticky top-0 bg-[#fbfaff] z-10">Month</th>
+                          <th className="px-4 py-2 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9] sticky top-0 bg-[#fbfaff] z-10">Farmers</th>
+                          <th className="px-4 py-2 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9] sticky top-0 bg-[#fbfaff] z-10">Hybrids</th>
                           <th className="px-4 py-2 text-[9px] font-extrabold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9] text-right sticky top-0 bg-[#fbfaff] z-10">Aksi</th>
                         </tr>
                       </thead>
@@ -13638,10 +13809,49 @@ const Dashboard = ({
                             <td className="px-4 py-2.5 text-[10px] font-semibold text-[#8E94B7]">
                               {proj.month}
                             </td>
+                            <td className="px-4 py-2.5">
+                              {(() => {
+                                const isFarmerEmpty = !proj.farmerReach || String(proj.farmerReach).trim() === "";
+                                const showRedBg = proposalSubmitAttempted && isFarmerEmpty;
+                                return (
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    placeholder="0"
+                                    value={proj.farmerReach || ""}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setGeneratedProjects((prev) =>
+                                        prev.map((p) => (p.id === proj.id ? { ...p, farmerReach: val } : p))
+                                      );
+                                    }}
+                                    className={`w-16 px-1.5 py-1 text-[10px] font-bold border rounded-lg transition-all ${
+                                      showRedBg
+                                        ? "bg-red-100 text-red-900 border-red-500 ring-1 ring-red-300 focus:outline-none focus:border-red-600 focus:ring-red-200"
+                                        : "border-slate-200 text-slate-800 bg-white focus:outline-none focus:border-[#154be2] focus:ring-1 focus:ring-[#154be2]/20"
+                                    }`}
+                                  />
+                                );
+                              })()}
+                            </td>
+                            <td className="px-4 py-2.5">
+                              <span className="inline-block px-2.5 py-1 text-[10px] font-extrabold text-slate-700 bg-slate-100 rounded-lg border border-slate-200 shadow-sm">
+                                {proj.hybrids || "ADV JAGO"}
+                              </span>
+                            </td>
                             <td className="px-4 py-2.5 text-right">
                               <button
                                 type="button"
-                                onClick={() => setGeneratedProjects(generatedProjects.filter((p) => p.id !== proj.id))}
+                                onClick={() => {
+                                  setGeneratedProjects(generatedProjects.filter((p) => p.id !== proj.id));
+                                  if (proj.rowId) {
+                                    setProcessingRows((prev) => {
+                                      const next = { ...prev };
+                                      delete next[proj.rowId];
+                                      return next;
+                                    });
+                                  }
+                                }}
                                 className="text-slate-400 hover:text-red-500 cursor-pointer transition-colors p-1 bg-white rounded shadow-sm border border-slate-200 hover:border-red-200 flex items-center justify-center ml-auto"
                                 title="Hapus dari antrean"
                               >
@@ -13661,6 +13871,17 @@ const Dashboard = ({
                     disabled={isSubmittingProposal}
                     onClick={() => {
                       if (generatedProjects.length === 0) return;
+                      
+                      const hasEmptyFarmer = generatedProjects.some((p) => !p.farmerReach || String(p.farmerReach).trim() === "");
+                      if (hasEmptyFarmer) {
+                        setProposalSubmitAttempted(true);
+                        setProposalAlert({
+                          message: "Mohon isi semua data jumlah petani (Farmers) sebelum mengirim!",
+                          type: "error"
+                        });
+                        return;
+                      }
+
                       setIsSubmittingProposal(true);
                       
                       setTimeout(() => {
@@ -13680,6 +13901,7 @@ const Dashboard = ({
                         setIsSubmittingProposal(false);
                         setProposalSuccessMsg(`Sukses! Berhasil mengirim ${generatedProjects.length} proyek ke database (dummy).`);
                         setGeneratedProjects([]); // Clear staging area
+                        setProposalSubmitAttempted(false); // Reset error state
                       }, 1000);
                     }}
                     className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white py-3 rounded-xl font-bold text-xs transition-all shadow-sm active:scale-98 cursor-pointer"
@@ -13712,31 +13934,42 @@ const Dashboard = ({
               <div className="flex items-center gap-2">
                 <div className="size-8 rounded-lg bg-indigo-50 flex items-center justify-center">
                   <span className="material-symbols-outlined text-[#154be2] text-[18px]">
-                    history
+                    send_and_archive
                   </span>
                 </div>
                 <div>
-                  <h3 className="text-xs font-bold text-[#181a2c] uppercase tracking-wider">Proposal History</h3>
+                  <h3 className="text-xs font-bold text-[#181a2c] uppercase tracking-wider">Proposal Submit</h3>
                   <p className="text-[9.5px] font-semibold text-[#8E94B7] mt-0.5">Daftar project pengajuan yang berhasil dikirim</p>
                 </div>
               </div>
 
-              {proposalsList.length > 0 && (
-                <button
-                  onClick={() => {
-                    if (window.confirm("Apakah Anda yakin ingin menghapus semua history dummy?")) {
-                      setProposalsList([]);
-                      try {
-                        localStorage.removeItem("radar_dg_proposals");
-                      } catch (e) {}
-                    }
-                  }}
-                  className="text-red-500 hover:text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 border border-red-200/50 cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[14px]">delete_sweep</span>
-                  Hapus Semua Dummy
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {proposalsList.length > 0 && (
+                  <button
+                    onClick={() => setIsPreviewPdfModalOpen(true)}
+                    className="bg-[#154be2] hover:bg-[#113cb5] text-white px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5 border border-blue-200/20 cursor-pointer shadow-sm active:scale-98"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">picture_as_pdf</span>
+                    Export to PDF
+                  </button>
+                )}
+                {proposalsList.length > 0 && (
+                  <button
+                    onClick={() => {
+                      if (window.confirm("Apakah Anda yakin ingin menghapus semua history dummy?")) {
+                        setProposalsList([]);
+                        try {
+                          localStorage.removeItem("radar_dg_proposals");
+                        } catch (e) {}
+                      }
+                    }}
+                    className="text-red-500 hover:text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 border border-red-200/50 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">delete_sweep</span>
+                    Hapus Semua Dummy
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="px-5 py-2.5 bg-slate-50 border-b border-[#f1f5f9] flex items-center gap-1.5 text-[10px] text-[#8E94B7] font-bold uppercase tracking-wider">
@@ -13905,6 +14138,163 @@ const Dashboard = ({
         onClose={() => setIsLogoutModalOpen(false)}
         onConfirm={onLogout}
       />
+
+      {/* Custom Alert Dialog for Iframe-safe notifications */}
+      {proposalAlert && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-[24px] shadow-[0_24px_48px_rgba(24,26,44,0.18)] border border-slate-100 p-6 max-w-sm w-full mx-4 transform animate-in zoom-in-95 duration-200 flex flex-col items-center text-center">
+            <div className={`size-12 rounded-full flex items-center justify-center mb-4 ${
+              proposalAlert.type === "error" ? "bg-rose-50 text-rose-600" : "bg-amber-50 text-amber-600"
+            }`}>
+              <span className="material-symbols-outlined text-[28px]">
+                {proposalAlert.type === "error" ? "error" : "warning"}
+              </span>
+            </div>
+            <h3 className="text-sm font-bold text-slate-800 mb-2 uppercase tracking-wider">
+              {proposalAlert.type === "error" ? "Peringatan" : "Informasi"}
+            </h3>
+            <p className="text-xs text-slate-600 font-bold leading-relaxed mb-6">
+              {proposalAlert.message}
+            </p>
+            <button
+              onClick={() => setProposalAlert(null)}
+              className="w-full py-2.5 bg-gradient-to-r from-[#154be2] to-cyan-500 text-white rounded-full font-bold text-[10px] uppercase tracking-wider shadow-md hover:shadow-lg transition-all active:scale-[0.98] cursor-pointer"
+            >
+              Oke, Mengerti
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* PDF Export Preview Modal */}
+      {isPreviewPdfModalOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-250 p-4">
+          <div className="bg-slate-50 rounded-[28px] shadow-[0_24px_60px_rgba(15,23,42,0.3)] border border-slate-200/80 w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="px-6 py-4 bg-white border-b border-slate-150 flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#154be2]">picture_as_pdf</span>
+                <span className="text-sm font-extrabold text-slate-800 uppercase tracking-wider">Pratinjau Dokumen Ekspor (A4 PDF)</span>
+              </div>
+              <button 
+                onClick={() => setIsPreviewPdfModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            {/* Document Preview Area */}
+            <div className="flex-1 overflow-y-auto p-6 md:p-10 flex justify-center bg-slate-100">
+              {/* Fake A4 Sheet */}
+              <div className="bg-white w-full max-w-[210mm] shadow-md border border-slate-200/60 p-8 md:p-12 text-slate-800 flex flex-col font-sans text-xs min-h-[297mm]">
+                
+                {/* Header */}
+                <div className="flex justify-between items-start border-b-2 border-[#154be2] pb-5 mb-6">
+                  <div>
+                    <h2 className="text-base font-extrabold text-[#154be2] tracking-tight uppercase">Laporan Pengajuan Kegiatan</h2>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Sistem Pendataan Digital RADAR DG</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[#154be2] font-black text-sm tracking-widest">RADAR DG</div>
+                    <p className="text-[9px] font-extrabold text-slate-400 uppercase mt-0.5">Advanta Seeds Indonesia</p>
+                  </div>
+                </div>
+
+                {/* Metadata Info */}
+                <div className="grid grid-cols-2 gap-4 mb-6 bg-slate-50/50 p-4 rounded-xl border border-slate-100 text-[10px] font-bold">
+                  <div>
+                    <div className="flex justify-between py-1 border-b border-slate-100">
+                      <span className="text-slate-400">Dicetak Oleh:</span>
+                      <span className="text-slate-700">Business Specialist</span>
+                    </div>
+                    <div className="flex justify-between py-1">
+                      <span className="text-slate-400">Sistem Aplikasi:</span>
+                      <span className="text-[#154be2]">RADAR DG Application v1.0</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between py-1 border-b border-slate-100">
+                      <span className="text-slate-400">Tanggal Dokumen:</span>
+                      <span className="text-slate-700">{new Date().toLocaleDateString("id-ID", { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                    </div>
+                    <div className="flex justify-between py-1">
+                      <span className="text-slate-400">Total Pengajuan:</span>
+                      <span className="text-emerald-600">{proposalsList.length} Proyek</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Content Table */}
+                <div className="flex-1 overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-[9.5px]">
+                    <thead>
+                      <tr className="bg-[#154be2] text-white">
+                        <th className="px-3 py-2 font-bold uppercase tracking-wider rounded-l-md">Project No</th>
+                        <th className="px-3 py-2 font-bold uppercase tracking-wider">BS Name</th>
+                        <th className="px-3 py-2 font-bold uppercase tracking-wider">Jenis Kegiatan</th>
+                        <th className="px-3 py-2 font-bold uppercase tracking-wider">Wilayah</th>
+                        <th className="px-2 py-2 font-bold uppercase tracking-wider text-center">Farmers</th>
+                        <th className="px-3 py-2 font-bold uppercase tracking-wider">Varietas</th>
+                        <th className="px-3 py-2 font-bold uppercase tracking-wider text-right rounded-r-md">Anggaran (IDR)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {proposalsList.map((p, idx) => (
+                        <tr key={p.id || idx} className="hover:bg-slate-50/50">
+                          <td className="px-3 py-2.5 font-mono font-bold text-[#154be2]">{p.projectNo}</td>
+                          <td className="px-3 py-2.5 font-bold text-slate-700">{p.bs}</td>
+                          <td className="px-3 py-2.5 text-slate-600 font-semibold">{p.activity}</td>
+                          <td className="px-3 py-2.5 text-slate-500 font-medium">{p.district}, {p.subDistrict}</td>
+                          <td className="px-2 py-2.5 text-slate-700 font-bold text-center">{p.farmerReach ? Number(p.farmerReach).toLocaleString() : "0"}</td>
+                          <td className="px-3 py-2.5 text-slate-600 font-medium">{p.hybrids || "-"}</td>
+                          <td className="px-3 py-2.5 text-right font-bold text-slate-700">Rp {p.budget ? Number(p.budget).toLocaleString() : "0"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Signatures */}
+                <div className="mt-12 pt-8 border-t border-slate-100 flex justify-between text-[10px] font-bold text-slate-600">
+                  <div className="flex flex-col items-center">
+                    <span>Diajukan Oleh,</span>
+                    <span className="text-[9px] font-medium text-slate-400 mt-0.5">Business Specialist</span>
+                    <div className="h-16"></div>
+                    <div className="w-36 border-b border-slate-300"></div>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <span>Disetujui Oleh,</span>
+                    <span className="text-[9px] font-medium text-slate-400 mt-0.5">Management / Lead</span>
+                    <div className="h-16"></div>
+                    <div className="w-36 border-b border-slate-300"></div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* Actions Footer */}
+            <div className="px-6 py-4 bg-white border-t border-slate-150 flex justify-end items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsPreviewPdfModalOpen(false)}
+                className="px-4 py-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-xl transition-all border border-slate-200 cursor-pointer"
+              >
+                Kembali
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadPdf}
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-extrabold text-[10px] uppercase tracking-wider shadow-md hover:shadow-lg transition-all active:scale-[0.98] flex items-center gap-1.5 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[15px]">download</span>
+                Ekspor & Unduh PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
