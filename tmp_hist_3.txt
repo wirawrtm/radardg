@@ -1,0 +1,161 @@
+      { key: "2027-03", label: "Mar 27", prop: "mar", monthIdx: 2, year: 2027 },
+    ];
+
+    const monthlyMap: Record<
+      string,
+      {
+        monthKey: string;
+        monthLabel: string;
+        opening: number;
+        ending: number;
+        stockIn: number;
+        idle: number;
+        pog: number;
+      }
+    > = {};
+    monthsSequence.forEach((item) => {
+      monthlyMap[item.key] = {
+        monthKey: item.key,
+        monthLabel: item.label,
+        opening: 0,
+        ending: 0,
+        stockIn: 0,
+        idle: 0,
+        pog: 0,
+      };
+    });
+
+    rawWorkingData.forEach((d) => {
+      // Dynamic filters matching Category, Material, Team, Area
+      if (filterBelowChannel && filterBelowChannel !== "All") {
+        const kName = cleanForMatch(d.kiosk);
+        const kInfo = kiosks.find((k) => cleanForMatch(k.name) === kName);
+        if (
+          !kInfo ||
+          cleanForMatch(kInfo.category || d.category) !==
+            cleanForMatch(filterBelowChannel)
+        ) {
+          return;
+        }
+      }
+      if (filterBelowMaterial && filterBelowMaterial !== "All") {
+        if (cleanForMatch(d.hybrid) !== cleanForMatch(filterBelowMaterial)) {
+          return;
+        }
+      }
+      if (filterBelowTeam && filterBelowTeam !== "All") {
+        const kName = cleanForMatch(d.kiosk);
+        const kInfo = kiosks.find((k) => cleanForMatch(k.name) === kName) || {};
+        const rawPic = normalizeName(String(d.user || kInfo.pic || "Unknown"));
+        const pic = getDdaOfUser(
+          rawPic,
+          userData?.name,
+          computedTeamProfiles,
+        );
+        if (cleanForMatch(pic) !== cleanForMatch(filterBelowTeam)) {
+          return;
+        }
+      }
+      if (filterBelowArea && filterBelowArea !== "All") {
+        const kName = cleanForMatch(d.kiosk);
+        const kInfo = kiosks.find((k) => cleanForMatch(k.name) === kName) || {};
+        const rawPic = normalizeName(String(d.user || kInfo.pic || "Unknown"));
+        const pic = getDdaOfUser(
+          rawPic,
+          userData?.name,
+          computedTeamProfiles,
+        );
+        const matchedMember = teamMembers.find((m) => matchNames(m, pic));
+        const area =
+          getFromRecord<string>(teamAreas, matchedMember || pic) ||
+          kInfo.area ||
+          d.area ||
+          "-";
+        if (cleanForMatch(area) !== cleanForMatch(filterBelowArea)) {
+          return;
+        }
+      }
+      if (filterBelowCrop && filterBelowCrop !== "All") {
+        const itemCrop =
+          d.crops || d.Crops || d.crop || d.Crop || d.CROP || d.CROPS || "";
+        if (!checkCropMatch(itemCrop, filterBelowCrop)) {
+          return;
+        }
+      }
+
+      // Find max POG across months to estimate capacity
+      let maxPogForKiosk = 0;
+      monthsSequence.forEach((cfg) => {
+        const val = Number((d as any)[cfg.prop]) || 0;
+        if (val > maxPogForKiosk) maxPogForKiosk = val;
+      });
+      if (maxPogForKiosk === 0) maxPogForKiosk = 100; // default baseline
+
+      // Initialize sequential inventory simulation for this specific channel partner
+      let currentOpening = Math.round(maxPogForKiosk * 1.5 + 40);
+
+      monthsSequence.forEach((cfg) => {
+        const pogVal = Number((d as any)[cfg.prop]) || 0;
+        const stockInVal = Math.round(pogVal * 1.08 + (pogVal > 0 ? 12 : 3));
+        const endingVal = Math.max(0, currentOpening + stockInVal - pogVal);
+        const idleVal = Math.min(
+          endingVal,
+          Math.round(currentOpening * 0.15 + 8),
+        );
+
+        monthlyMap[cfg.key].opening += currentOpening;
+        monthlyMap[cfg.key].ending += endingVal;
+        monthlyMap[cfg.key].stockIn += stockInVal;
+        monthlyMap[cfg.key].idle += idleVal;
+        monthlyMap[cfg.key].pog += pogVal;
+
+        currentOpening = endingVal;
+      });
+    });
+
+    return monthsSequence.map((cfg) => monthlyMap[cfg.key]);
+  }, [
+    rawWorkingData,
+    kiosks,
+    filterBelowChannel,
+    filterBelowMaterial,
+    filterBelowTeam,
+    filterBelowArea,
+    filterBelowCrop,
+    userData,
+    teamMembers,
+    teamAreas,
+  ]);
+
+  const activityDonutCardsData = useMemo(() => {
+    const REGULAR_LIST = ["FFD", "FM", "ODP", "SFT", "BC", "PT"];
+    const ADHOC_LIST = ["BFFD", "BFM", "BFT", "CRV", "EXP"];
+    let ACTIVITIES_LIST = ["FFD", "FM", "ODP", "SFT", "BFFD", "BFM", "BFT", "BC", "CRV", "EXP", "PT"];
+    if (filterBelowType === "Regular") {
+      ACTIVITIES_LIST = REGULAR_LIST;
+    } else if (filterBelowType === "AdHoc") {
+      ACTIVITIES_LIST = ADHOC_LIST;
+    }
+
+    const ORIGINAL_ACTIVITIES_LIST = ["FFD", "FM", "ODP", "SFT", "BFFD", "BFM", "BFT", "BC", "CRV", "EXP", "PT"];
+
+    const totals: Record<string, { budgetActivity: number; actualActivity: number; budgetNominal: number; actualNominal: number; budgetReach: number; actualReach: number }> = {
+      FFD: { budgetActivity: 120, actualActivity: 95, budgetNominal: 150000000, actualNominal: 125000000, budgetReach: 3000, actualReach: 2400 },
+      FM: { budgetActivity: 250, actualActivity: 210, budgetNominal: 320000000, actualNominal: 280000000, budgetReach: 6250, actualReach: 5250 },
+      ODP: { budgetActivity: 80, actualActivity: 72, budgetNominal: 90000000, actualNominal: 81000000, budgetReach: 2000, actualReach: 1800 },
+      SFT: { budgetActivity: 150, actualActivity: 130, budgetNominal: 180000000, actualNominal: 162000000, budgetReach: 3750, actualReach: 3250 },
+      BFFD: { budgetActivity: 60, actualActivity: 45, budgetNominal: 90000000, actualNominal: 70000000, budgetReach: 1500, actualReach: 1125 },
+      BFM: { budgetActivity: 110, actualActivity: 90, budgetNominal: 160000000, actualNominal: 130000000, budgetReach: 2750, actualReach: 2250 },
+      BFT: { budgetActivity: 45, actualActivity: 38, budgetNominal: 75000000, actualNominal: 65000000, budgetReach: 1125, actualReach: 950 },
+      BC: { budgetActivity: 200, actualActivity: 175, budgetNominal: 120000000, actualNominal: 105000000, budgetReach: 5000, actualReach: 4375 },
+      CRV: { budgetActivity: 70, actualActivity: 58, budgetNominal: 110000000, actualNominal: 95000000, budgetReach: 1750, actualReach: 1450 },
+      EXP: { budgetActivity: 30, actualActivity: 24, budgetNominal: 140000000, actualNominal: 115000000, budgetReach: 750, actualReach: 600 },
+      PT: { budgetActivity: 95, actualActivity: 82, budgetNominal: 55000000, actualNominal: 48000000, budgetReach: 2375, actualReach: 2050 },
+    };
+
+    pogDataOverviewFiltered.forEach((item) => {
+      const kioskCharSum = (item.kiosk || "").split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+      const seedVal = kioskCharSum % 100;
+      const actIdx = kioskCharSum % ORIGINAL_ACTIVITIES_LIST.length;
+      const actName = ORIGINAL_ACTIVITIES_LIST[actIdx];
+

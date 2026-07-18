@@ -8,6 +8,7 @@ import React, {
 import { Html5Qrcode } from "html5-qrcode";
 import { AdvantaLogo } from "./AdvantaLogo";
 import { UserIcon } from "./UserIcon";
+import { User } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
   ResponsiveContainer,
@@ -128,7 +129,7 @@ const CustomBarBackground = (props: any) => {
       y={y}
       width={width + 8}
       height={height}
-      fill="rgba(21, 75, 226, 0.08)"
+      fill="rgba(249, 115, 22, 0.15)"
       rx={6}
     />
   );
@@ -349,16 +350,29 @@ const formatOverviewWithUnit = (
 
 const parseTaskDate = (timestamp: any) => {
   if (!timestamp) return null;
-  let d;
-  if (typeof timestamp === "string" && timestamp.includes("/")) {
-    const parts = timestamp.split(/[\s/:]+/);
-    if (parts.length >= 3) {
-      d = new Date(
-        `${parts[2]}-${parts[1]}-${parts[0]}T${parts[3] || "00"}:${parts[4] || "00"}:${parts[5] || "00"}`,
-      );
-    } else d = new Date(timestamp);
-  } else {
-    d = new Date(timestamp);
+  if (timestamp instanceof Date) return timestamp;
+  let d = new Date(timestamp);
+  if (!isNaN(d.getTime())) return d;
+
+  if (typeof timestamp === "string") {
+    const isSlash = timestamp.includes("/");
+    const isDash = timestamp.includes("-");
+    if (isSlash || isDash) {
+      const parts = timestamp.split(/[\s/:-]+/);
+      if (parts.length >= 3) {
+        if (parts[0].length === 4) {
+          const dStr = `${parts[0]}-${parts[1]}-${parts[2]}T${parts[3] || "00"}:${parts[4] || "00"}:${parts[5] || "00"}`;
+          d = new Date(dStr);
+        } else {
+          let year = parts[2];
+          if (year.length === 2 && !isNaN(Number(year))) {
+            year = "20" + year;
+          }
+          const dStr = `${year}-${parts[1]}-${parts[0]}T${parts[3] || "00"}:${parts[4] || "00"}:${parts[5] || "00"}`;
+          d = new Date(dStr);
+        }
+      }
+    }
   }
   return d && !isNaN(d.getTime()) ? d : null;
 };
@@ -1690,9 +1704,34 @@ const Dashboard = ({
   setFilterBelowArea,
   filterBelowCrop,
   setFilterBelowCrop,
+  filterBelowType,
+  setFilterBelowType,
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const [hoveredLabel, setHoveredLabel] = useState<string | null>(null);
+  const [dismissedTooltipLabel, setDismissedTooltipLabel] = useState<string | null>(null);
+  const [activeSubBarKey, setActiveSubBarKey] = useState<string | null>(null);
+  const [dismissedSubTooltipLabel, setDismissedSubTooltipLabel] = useState<string | null>(null);
+  const [showBudgetBar, setShowBudgetBar] = useState<boolean>(true);
+  const [showActualBar, setShowActualBar] = useState<boolean>(true);
+  const clickedBarRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    const handleGlobalClick = () => {
+      if (clickedBarRef.current) {
+        clickedBarRef.current = false;
+        return;
+      }
+      if (hoveredLabel) {
+        setDismissedTooltipLabel(hoveredLabel);
+        setDismissedSubTooltipLabel(hoveredLabel);
+      }
+    };
+    window.addEventListener("click", handleGlobalClick);
+    return () => window.removeEventListener("click", handleGlobalClick);
+  }, [hoveredLabel]);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [isUserSwitching, setIsUserSwitching] = useState(false);
   const [historyChartType, setHistoryChartType] = useState<
@@ -1857,9 +1896,9 @@ const Dashboard = ({
   const isArea = overviewGroupDimension === "area";
   const isProvince = overviewGroupDimension === "province";
 
-  const currentBarGap = 0;
-  const currentBarCategoryGap = "10%";
-  const currentMaxBarSize = 75;
+  const currentBarGap = -15;
+  const currentBarCategoryGap = "5%";
+  const currentMaxBarSize = 85;
 
   const isBusinessAnalyst = useMemo(() => {
     if (!userData) return false;
@@ -1983,6 +2022,23 @@ const Dashboard = ({
   const [focusedChartType, setFocusedChartType] = useState<"main" | "sub">("main");
   const [activeMainBarKey, setActiveMainBarKey] = useState<string | null>(null);
   const [activeActivityFilter, setActiveActivityFilter] = useState<string | null>(null);
+  const [conversionSalesFilter, setConversionSalesFilter] = useState("activity");
+  const [conversionActivityFilter, setConversionActivityFilter] = useState("activity");
+  const [activeConversionActivity, setActiveConversionActivity] = useState("Farmer Meeting");
+  const [isMonthDropdownOpen, setIsMonthDropdownOpen] = useState(false);
+  const monthDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (monthDropdownRef.current && !monthDropdownRef.current.contains(event.target as Node)) {
+        setIsMonthDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   // State Employee Modifying & Hirarki Expand/Collapse
   const [employeeEditModal, setEmployeeEditModal] = useState<{
@@ -4197,15 +4253,24 @@ const Dashboard = ({
     let d = new Date(timestamp);
     if (!isNaN(d.getTime())) return d;
 
-    if (typeof timestamp === "string" && timestamp.includes("/")) {
-      const parts = timestamp.split(/[\s/:]+/);
-      if (parts.length >= 3) {
-        let year = parts[2];
-        if (year.length === 2 && !isNaN(Number(year))) {
-          year = "20" + year;
+    if (typeof timestamp === "string") {
+      const isSlash = timestamp.includes("/");
+      const isDash = timestamp.includes("-");
+      if (isSlash || isDash) {
+        const parts = timestamp.split(/[\s/:-]+/);
+        if (parts.length >= 3) {
+          if (parts[0].length === 4) {
+            const dStr = `${parts[0]}-${parts[1]}-${parts[2]}T${parts[3] || "00"}:${parts[4] || "00"}:${parts[5] || "00"}`;
+            d = new Date(dStr);
+          } else {
+            let year = parts[2];
+            if (year.length === 2 && !isNaN(Number(year))) {
+              year = "20" + year;
+            }
+            const dStr = `${year}-${parts[1]}-${parts[0]}T${parts[3] || "00"}:${parts[4] || "00"}:${parts[5] || "00"}`;
+            d = new Date(dStr);
+          }
         }
-        const dStr = `${year}-${parts[1]}-${parts[0]}T${parts[3] || "00"}:${parts[4] || "00"}:${parts[5] || "00"}`;
-        d = new Date(dStr);
       }
     }
     return isNaN(d.getTime()) ? new Date(0) : d;
@@ -4403,6 +4468,22 @@ const Dashboard = ({
 
     // 1. Months
     const monthsSet = new Set<string>();
+    const defaultMonths = [
+      "April 2026",
+      "Mei 2026",
+      "Juni 2026",
+      "Juli 2026",
+      "Agustus 2026",
+      "September 2026",
+      "Oktober 2026",
+      "November 2026",
+      "Desember 2026",
+      "Januari 2027",
+      "Februari 2027",
+      "Maret 2027",
+    ];
+    defaultMonths.forEach((m) => monthsSet.add(m));
+
     rawData.forEach((d) => {
       if (d.timestamp) {
         const dateObj = parseDateForPog(d.timestamp);
@@ -4416,9 +4497,18 @@ const Dashboard = ({
     const months = Array.from(monthsSet).sort((a, b) => {
       const partsA = a.split(" ");
       const partsB = b.split(" ");
-      const yearDiff = parseInt(partsA[1], 10) - parseInt(partsB[1], 10);
-      if (yearDiff !== 0) return yearDiff;
-      return INDO_MONTHS.indexOf(partsA[0]) - INDO_MONTHS.indexOf(partsB[0]);
+      const mIdxA = INDO_MONTHS.indexOf(partsA[0]);
+      const mIdxB = INDO_MONTHS.indexOf(partsB[0]);
+      const yearA = parseInt(partsA[1], 10);
+      const yearB = parseInt(partsB[1], 10);
+      
+      const getOrder = (mIdx: number, year: number) => {
+        const seasonalYear = mIdx < 3 ? year - 1 : year;
+        const seasonalMonthIdx = mIdx < 3 ? mIdx + 9 : mIdx - 3;
+        return seasonalYear * 12 + seasonalMonthIdx;
+      };
+      
+      return getOrder(mIdxA, yearA) - getOrder(mIdxB, yearB);
     });
 
     // 2. Channel (Category)
@@ -4493,30 +4583,7 @@ const Dashboard = ({
 
   // Recalculate processed POG data base on selected month filter
   const pogDataProcessedForOverview = useMemo(() => {
-    const now = new Date();
-    let targetMonth = now.getMonth();
-    let targetYear = now.getFullYear();
-    const isFilteredMonth = filterBelowMonth && filterBelowMonth !== "All";
-
-    if (isFilteredMonth) {
-      const parts = filterBelowMonth.split(" ");
-      const mIdx = INDO_MONTHS.indexOf(parts[0]);
-      if (mIdx !== -1) {
-        targetMonth = mIdx;
-        targetYear = parseInt(parts[1], 10);
-      }
-    }
-
-    const startOfTargetMonthTime = new Date(
-      targetYear,
-      targetMonth,
-      1,
-    ).getTime();
-    const endOfTargetMonthTime = new Date(
-      targetYear,
-      targetMonth + 1,
-      1,
-    ).getTime();
+    const isFilteredMonth = filterBelowMonth && filterBelowMonth.length > 0;
 
     const monthCols = [
       "jan",
@@ -4532,9 +4599,45 @@ const Dashboard = ({
       "nov",
       "des",
     ];
-    const prevMonthIndex = targetMonth - 1;
-    const prevMonthCol = prevMonthIndex >= 0 ? monthCols[prevMonthIndex] : null;
-    const targetMonthCol = monthCols[targetMonth];
+
+    // Map month names to a comparable numeric value for sorting
+    const monthToValue = (mStr: string) => {
+      const parts = mStr.split(" ");
+      const mIdx = INDO_MONTHS.indexOf(parts[0]);
+      const year = parseInt(parts[1], 10);
+      return year * 12 + mIdx;
+    };
+
+    // Sort selected months chronologically to identify earliest and latest
+    const sortedSelected = isFilteredMonth
+      ? [...filterBelowMonth].sort((a, b) => monthToValue(a) - monthToValue(b))
+      : [];
+
+    let earliestMonthName = "April";
+    let earliestMonthYear = 2026;
+    let latestMonthName = "Maret";
+    let latestMonthYear = 2027;
+
+    if (isFilteredMonth) {
+      const earliestParts = sortedSelected[0].split(" ");
+      earliestMonthName = earliestParts[0];
+      earliestMonthYear = parseInt(earliestParts[1], 10);
+
+      const latestParts = sortedSelected[sortedSelected.length - 1].split(" ");
+      latestMonthName = latestParts[0];
+      latestMonthYear = parseInt(latestParts[1], 10);
+    }
+
+    const earliestMonthIdx = INDO_MONTHS.indexOf(earliestMonthName);
+    const prevMonthIndex = earliestMonthIdx - 1;
+    const prevMonthCol = prevMonthIndex >= 0 ? monthCols[prevMonthIndex] : "des";
+
+    const latestMonthIdx = INDO_MONTHS.indexOf(latestMonthName);
+    const endOfLatestMonthTime = new Date(
+      latestMonthYear,
+      latestMonthIdx + 1,
+      1,
+    ).getTime();
 
     const picToUplineMap: Record<string, string> = {};
     kiosks.forEach((k) => {
@@ -4597,8 +4700,8 @@ const Dashboard = ({
       const dateObj = parseDateForPog(d.timestamp);
       const t = dateObj.getTime();
 
-      // If filtering by specific month, skip transactions that happened after the end of this target month
-      if (isFilteredMonth && t >= endOfTargetMonthTime) {
+      // Skip transactions that happen after the latest selected month
+      if (isFilteredMonth && t >= endOfLatestMonthTime) {
         return;
       }
 
@@ -4635,29 +4738,38 @@ const Dashboard = ({
         lotMap[key].latestRow = d;
       }
 
+      const rowMStr = `${INDO_MONTHS[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
+      const isSelectedMonth = !isFilteredMonth || filterBelowMonth.includes(rowMStr);
+
       const pogVal = Number(d.pog) || 0;
-      if (pogVal < 0) {
-        lotMap[key].sellIn += Math.abs(pogVal);
-      } else if (pogVal > 0) {
-        lotMap[key].sellOut += pogVal;
-        lotMap[key].pogAccumulated += pogVal;
+      if (isSelectedMonth) {
+        if (pogVal < 0) {
+          lotMap[key].sellIn += Math.abs(pogVal);
+        } else if (pogVal > 0) {
+          lotMap[key].sellOut += pogVal;
+          lotMap[key].pogAccumulated += pogVal;
+        }
       }
     });
 
-    // Extract opening (lastQty) and ending (currentQty) directly from monthly columns of the latest row
     Object.values(lotMap).forEach((item: any) => {
       if (item.latestRow) {
         const row = item.latestRow;
-        item.lastQty =
-          prevMonthCol &&
-          row[prevMonthCol] !== undefined &&
-          Number(row[prevMonthCol]) > 0
-            ? Number(row[prevMonthCol])
-            : Number(row.lastQty) || 0;
+        
+        let resolvedLastQty = 0;
+        if (isFilteredMonth) {
+          resolvedLastQty =
+            prevMonthCol &&
+            row[prevMonthCol] !== undefined &&
+            Number(row[prevMonthCol]) > 0
+              ? Number(row[prevMonthCol])
+              : Number(row.lastQty) || 0;
+        } else {
+          resolvedLastQty = Number(row.lastQty) || 0;
+        }
 
-        // Calculate End of Inv mathematically (Opening + Stock In - POG)
+        item.lastQty = resolvedLastQty;
         item.currentQty = item.lastQty + item.sellIn - item.pogAccumulated;
-
         item.idleStock = Math.max(0, item.lastQty - item.pogAccumulated);
       }
     });
@@ -4689,17 +4801,9 @@ const Dashboard = ({
     filterBelowMonth,
   ]);
 
-  // Apply other category filters (channel, material, team, area) to computed list
+  // Apply other category filters (material, team, area) to computed list
   const pogDataOverviewFiltered = useMemo(() => {
     let result = pogDataProcessedForOverview;
-
-    // Filter 2: channel (Category)
-    if (filterBelowChannel && filterBelowChannel !== "All") {
-      result = result.filter(
-        (item) =>
-          cleanForMatch(item.category) === cleanForMatch(filterBelowChannel),
-      );
-    }
 
     // Filter 2: material (Hybrid)
     if (filterBelowMaterial && filterBelowMaterial !== "All") {
@@ -4730,6 +4834,22 @@ const Dashboard = ({
       );
     }
 
+    // Filter: Type (Regular vs AdHoc)
+    if (filterBelowType && filterBelowType !== "All") {
+      result = result.filter((item) => {
+        const kioskCharSum = (item.kiosk || "").split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+        const actIdx = kioskCharSum % 11;
+        const ACTIVITIES_LIST = ["FFD", "FM", "ODP", "SFT", "BFFD", "BFM", "BFT", "BC", "CRV", "EXP", "PT"];
+        const actName = ACTIVITIES_LIST[actIdx];
+        const isRegular = ["FFD", "FM", "ODP", "SFT", "BC", "PT"].includes(actName);
+        if (filterBelowType === "Regular") {
+          return isRegular;
+        } else {
+          return !isRegular;
+        }
+      });
+    }
+
     return result;
   }, [
     pogDataProcessedForOverview,
@@ -4738,6 +4858,7 @@ const Dashboard = ({
     filterBelowTeam,
     filterBelowArea,
     filterBelowCrop,
+    filterBelowType,
   ]);
 
   const overviewHistoryData = useMemo(() => {
@@ -4774,22 +4895,36 @@ const Dashboard = ({
       {
         monthKey: string;
         monthLabel: string;
+        name: string;
         opening: number;
         ending: number;
         stockIn: number;
         idle: number;
         pog: number;
+        budgetActivity: number;
+        actualActivity: number;
+        budgetNominal: number;
+        actualNominal: number;
+        budgetReach: number;
+        actualReach: number;
       }
     > = {};
     monthsSequence.forEach((item) => {
       monthlyMap[item.key] = {
         monthKey: item.key,
         monthLabel: item.label,
+        name: item.label,
         opening: 0,
         ending: 0,
         stockIn: 0,
         idle: 0,
         pog: 0,
+        budgetActivity: 0,
+        actualActivity: 0,
+        budgetNominal: 0,
+        actualNominal: 0,
+        budgetReach: 0,
+        actualReach: 0,
       };
     });
 
@@ -4877,6 +5012,13 @@ const Dashboard = ({
         monthlyMap[cfg.key].idle += idleVal;
         monthlyMap[cfg.key].pog += pogVal;
 
+        monthlyMap[cfg.key].actualActivity += pogVal;
+        monthlyMap[cfg.key].budgetActivity += Math.round(pogVal * 1.15 + (pogVal > 0 ? 5 : 2));
+        monthlyMap[cfg.key].actualNominal += Math.round(pogVal * 1.12) * 150000;
+        monthlyMap[cfg.key].budgetNominal += Math.round(pogVal * 1.15 + (pogVal > 0 ? 5 : 2)) * 150000;
+        monthlyMap[cfg.key].actualReach += Math.round(pogVal * 0.8 * 1.05);
+        monthlyMap[cfg.key].budgetReach += Math.round(pogVal * 1.15 + (pogVal > 0 ? 5 : 2)) * 0.8;
+
         currentOpening = endingVal;
       });
     });
@@ -4896,19 +5038,36 @@ const Dashboard = ({
   ]);
 
   const activityDonutCardsData = useMemo(() => {
-    const ACTIVITIES_LIST = ["FFD", "FM", "ODP", "SFT"];
-    const totals: Record<string, { budgetActivity: number; actualActivity: number; budgetNominal: number; actualNominal: number }> = {
-      FFD: { budgetActivity: 120, actualActivity: 95, budgetNominal: 150000000, actualNominal: 125000000 },
-      FM: { budgetActivity: 250, actualActivity: 210, budgetNominal: 320000000, actualNominal: 280000000 },
-      ODP: { budgetActivity: 80, actualActivity: 72, budgetNominal: 90000000, actualNominal: 81000000 },
-      SFT: { budgetActivity: 150, actualActivity: 130, budgetNominal: 180000000, actualNominal: 162000000 },
+    const REGULAR_LIST = ["FFD", "FM", "ODP", "SFT", "BC", "PT"];
+    const ADHOC_LIST = ["BFFD", "BFM", "BFT", "CRV", "EXP"];
+    let ACTIVITIES_LIST = ["FFD", "FM", "ODP", "SFT", "BFFD", "BFM", "BFT", "BC", "CRV", "EXP", "PT"];
+    if (filterBelowType === "Regular") {
+      ACTIVITIES_LIST = REGULAR_LIST;
+    } else if (filterBelowType === "AdHoc") {
+      ACTIVITIES_LIST = ADHOC_LIST;
+    }
+
+    const ORIGINAL_ACTIVITIES_LIST = ["FFD", "FM", "ODP", "SFT", "BFFD", "BFM", "BFT", "BC", "CRV", "EXP", "PT"];
+
+    const totals: Record<string, { budgetActivity: number; actualActivity: number; budgetNominal: number; actualNominal: number; budgetReach: number; actualReach: number }> = {
+      FFD: { budgetActivity: 120, actualActivity: 95, budgetNominal: 150000000, actualNominal: 125000000, budgetReach: 3000, actualReach: 2400 },
+      FM: { budgetActivity: 250, actualActivity: 210, budgetNominal: 320000000, actualNominal: 280000000, budgetReach: 6250, actualReach: 5250 },
+      ODP: { budgetActivity: 80, actualActivity: 72, budgetNominal: 90000000, actualNominal: 81000000, budgetReach: 2000, actualReach: 1800 },
+      SFT: { budgetActivity: 150, actualActivity: 130, budgetNominal: 180000000, actualNominal: 162000000, budgetReach: 3750, actualReach: 3250 },
+      BFFD: { budgetActivity: 60, actualActivity: 45, budgetNominal: 90000000, actualNominal: 70000000, budgetReach: 1500, actualReach: 1125 },
+      BFM: { budgetActivity: 110, actualActivity: 90, budgetNominal: 160000000, actualNominal: 130000000, budgetReach: 2750, actualReach: 2250 },
+      BFT: { budgetActivity: 45, actualActivity: 38, budgetNominal: 75000000, actualNominal: 65000000, budgetReach: 1125, actualReach: 950 },
+      BC: { budgetActivity: 200, actualActivity: 175, budgetNominal: 120000000, actualNominal: 105000000, budgetReach: 5000, actualReach: 4375 },
+      CRV: { budgetActivity: 70, actualActivity: 58, budgetNominal: 110000000, actualNominal: 95000000, budgetReach: 1750, actualReach: 1450 },
+      EXP: { budgetActivity: 30, actualActivity: 24, budgetNominal: 140000000, actualNominal: 115000000, budgetReach: 750, actualReach: 600 },
+      PT: { budgetActivity: 95, actualActivity: 82, budgetNominal: 55000000, actualNominal: 48000000, budgetReach: 2375, actualReach: 2050 },
     };
 
     pogDataOverviewFiltered.forEach((item) => {
       const kioskCharSum = (item.kiosk || "").split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
       const seedVal = kioskCharSum % 100;
-      const actIdx = kioskCharSum % ACTIVITIES_LIST.length;
-      const actName = ACTIVITIES_LIST[actIdx];
+      const actIdx = kioskCharSum % ORIGINAL_ACTIVITIES_LIST.length;
+      const actName = ORIGINAL_ACTIVITIES_LIST[actIdx];
 
       const rowBudAct = 1 + (seedVal % 4);
       const rowActAct = Math.round(rowBudAct * (0.8 + (seedVal % 20) / 100));
@@ -4916,32 +5075,44 @@ const Dashboard = ({
       const rowBudNom = (2000000 + (seedVal * 150000) % 15000000);
       const rowActNom = Math.round(rowBudNom * (0.82 + (seedVal % 18) / 100));
 
+      const rowBudReach = rowBudAct * (20 + (seedVal % 15));
+      const rowActReach = Math.round(rowBudReach * (0.8 + (seedVal % 20) / 100));
+
       if (totals[actName]) {
         totals[actName].budgetActivity += rowBudAct;
         totals[actName].actualActivity += rowActAct;
         totals[actName].budgetNominal += rowBudNom;
         totals[actName].actualNominal += rowActNom;
+        totals[actName].budgetReach += rowBudReach;
+        totals[actName].actualReach += rowActReach;
       }
     });
 
-    const totalBudgetAct = Object.values(totals).reduce((sum, t) => sum + t.budgetActivity, 0);
-    const totalActualAct = Object.values(totals).reduce((sum, t) => sum + t.actualActivity, 0);
-    const totalBudgetNom = Object.values(totals).reduce((sum, t) => sum + t.budgetNominal, 0);
-    const totalActualNom = Object.values(totals).reduce((sum, t) => sum + t.actualNominal, 0);
+    const activeTotals = Object.keys(totals)
+      .filter((k) => ACTIVITIES_LIST.includes(k))
+      .map((k) => totals[k]);
+
+    const totalBudgetAct = activeTotals.reduce((sum, t) => sum + t.budgetActivity, 0);
+    const totalActualAct = activeTotals.reduce((sum, t) => sum + t.actualActivity, 0);
+    const totalBudgetNom = activeTotals.reduce((sum, t) => sum + t.budgetNominal, 0);
+    const totalActualNom = activeTotals.reduce((sum, t) => sum + t.actualNominal, 0);
+    const totalBudgetReach = activeTotals.reduce((sum, t) => sum + t.budgetReach, 0);
+    const totalActualReach = activeTotals.reduce((sum, t) => sum + t.actualReach, 0);
 
     const listToMap = ["TOTAL", ...ACTIVITIES_LIST];
 
     return listToMap.map((name) => {
       const isNominal = overviewMetricFilter === "nominal";
+      const isReach = overviewMetricFilter === "reach";
       let budget = 0;
       let actual = 0;
       if (name === "TOTAL") {
-        budget = isNominal ? totalBudgetNom : totalBudgetAct;
-        actual = isNominal ? totalActualNom : totalActualAct;
+        budget = isNominal ? totalBudgetNom : isReach ? totalBudgetReach : totalBudgetAct;
+        actual = isNominal ? totalActualNom : isReach ? totalActualReach : totalActualAct;
       } else {
         const t = totals[name];
-        budget = isNominal ? t.budgetNominal : t.budgetActivity;
-        actual = isNominal ? t.actualNominal : t.actualActivity;
+        budget = isNominal ? t.budgetNominal : isReach ? t.budgetReach : t.budgetActivity;
+        actual = isNominal ? t.actualNominal : isReach ? t.actualReach : t.actualActivity;
       }
 
       const pct = budget > 0 ? Math.round((actual / budget) * 100) : 0;
@@ -4949,16 +5120,24 @@ const Dashboard = ({
       let actualStr = "";
       let budgetStr = "";
       if (isNominal) {
-        if (actual >= 1000000000) actualStr = `Rp ${(actual / 1000000000).toFixed(1)}M`;
-        else if (actual >= 1000000) actualStr = `Rp ${(actual / 1000000).toFixed(0)}Jt`;
-        else actualStr = `Rp ${actual.toLocaleString()}`;
+        if (actual >= 1000000000) actualStr = `${(actual / 1000000000).toFixed(1)}M`;
+        else if (actual >= 1000000) actualStr = `${(actual / 1000000).toFixed(0)}Jt`;
+        else actualStr = `${actual.toLocaleString()}`;
 
-        if (budget >= 1000000000) budgetStr = `Rp ${(budget / 1000000000).toFixed(1)}M`;
-        else if (budget >= 1000000) budgetStr = `Rp ${(budget / 1000000).toFixed(0)}Jt`;
-        else budgetStr = `Rp ${budget.toLocaleString()}`;
+        if (budget >= 1000000000) budgetStr = `${(budget / 1000000000).toFixed(1)}M`;
+        else if (budget >= 1000000) budgetStr = `${(budget / 1000000).toFixed(0)}Jt`;
+        else budgetStr = `${budget.toLocaleString()}`;
+      } else if (isReach) {
+        if (actual >= 1000000) actualStr = `${(actual / 1000000).toFixed(1)}M`;
+        else if (actual >= 1000) actualStr = `${(actual / 1000).toFixed(1)}K`;
+        else actualStr = `${actual.toLocaleString()}`;
+
+        if (budget >= 1000000) budgetStr = `${(budget / 1000000).toFixed(1)}M`;
+        else if (budget >= 1000) budgetStr = `${(budget / 1000).toFixed(1)}K`;
+        else budgetStr = `${budget.toLocaleString()}`;
       } else {
-        actualStr = `${actual} x`;
-        budgetStr = `${budget} x`;
+        actualStr = `${actual}`;
+        budgetStr = `${budget}`;
       }
 
       const remaining = Math.max(0, budget - actual);
@@ -4977,7 +5156,14 @@ const Dashboard = ({
         fullName: name === "FFD" ? "Farmer Field Day" :
                   name === "FM" ? "Farmer Meeting" :
                   name === "ODP" ? "One Day Promo" :
-                  name === "SFT" ? "Special Field Trip" : "Total Seluruh Kegiatan",
+                  name === "SFT" ? "Special Field Trip" :
+                  name === "BFFD" ? "Big Farmer Field Day" :
+                  name === "BFM" ? "Big Farmer Meeting" :
+                  name === "BFT" ? "Big Field Trip" :
+                  name === "BC" ? "Branding Crop" :
+                  name === "CRV" ? "Caravan" :
+                  name === "EXP" ? "Expo" :
+                  name === "PT" ? "Pasar Tani" : "Total Activity",
         budget,
         actual,
         actualStr,
@@ -4986,7 +5172,7 @@ const Dashboard = ({
         chartData
       };
     });
-  }, [pogDataOverviewFiltered, overviewMetricFilter]);
+  }, [pogDataOverviewFiltered, overviewMetricFilter, filterBelowType]);
 
   const overviewStats = useMemo(() => {
     let activeKiosks = kiosks || [];
@@ -5059,7 +5245,7 @@ const Dashboard = ({
       "Mulyono", "Setiawan", "Herianto", "Bambang", "Edi Purwanto", "Wawan"
     ];
     const HYBRIDS_LIST = ["JAGO", "RUBY", "JALU", "GANESH"];
-    const ACTIVITIES_LIST = ["FFD", "FM", "ODP", "SFT"];
+    const ACTIVITIES_LIST = ["FFD", "FM", "ODP", "SFT", "BFFD", "BFM", "BFT", "BC", "CRV", "EXP", "PT"];
 
     const getDeterministicDummy = (name: string, index: number) => {
       // Create high-quality, realistic dummy metrics based on the name hash
@@ -5082,6 +5268,10 @@ const Dashboard = ({
       const budgetNominal = Math.floor((50000000 + (seedVal * 3500000) % 300000000) * multiplier);
       const actualNominal = Math.floor(budgetNominal * (0.82 + (seedVal % 18) / 100));
 
+      // Reach metrics: number of attending farmers (e.g. 300 to 2400 farmers)
+      const budgetReach = Math.floor(budgetActivity * (20 + (seedVal % 15)));
+      const actualReach = Math.floor(actualActivity * (18 + ((seedVal + 3) % 15)));
+
       return {
         name,
         pog,
@@ -5093,7 +5283,9 @@ const Dashboard = ({
         budgetActivity,
         actualActivity,
         budgetNominal,
-        actualNominal
+        actualNominal,
+        budgetReach,
+        actualReach,
       };
     };
 
@@ -5113,6 +5305,8 @@ const Dashboard = ({
           actualActivity: number;
           budgetNominal: number;
           actualNominal: number;
+          budgetReach: number;
+          actualReach: number;
         }
       > = {};
 
@@ -5133,6 +5327,8 @@ const Dashboard = ({
             dummy.actualActivity = Math.round(dummy.actualActivity * scaleFactor);
             dummy.budgetNominal = Math.round(dummy.budgetNominal * scaleFactor);
             dummy.actualNominal = Math.round(dummy.actualNominal * scaleFactor);
+            dummy.budgetReach = Math.round(dummy.budgetReach * scaleFactor);
+            dummy.actualReach = Math.round(dummy.actualReach * scaleFactor);
           }
           gMap[area] = dummy;
         });
@@ -5150,6 +5346,8 @@ const Dashboard = ({
             dummy.actualActivity = Math.round(dummy.actualActivity * scaleFactor);
             dummy.budgetNominal = Math.round(dummy.budgetNominal * scaleFactor);
             dummy.actualNominal = Math.round(dummy.actualNominal * scaleFactor);
+            dummy.budgetReach = Math.round(dummy.budgetReach * scaleFactor);
+            dummy.actualReach = Math.round(dummy.actualReach * scaleFactor);
           }
           gMap[prov] = dummy;
         });
@@ -5167,6 +5365,8 @@ const Dashboard = ({
             dummy.actualActivity = Math.round(dummy.actualActivity * scaleFactor);
             dummy.budgetNominal = Math.round(dummy.budgetNominal * scaleFactor);
             dummy.actualNominal = Math.round(dummy.actualNominal * scaleFactor);
+            dummy.budgetReach = Math.round(dummy.budgetReach * scaleFactor);
+            dummy.actualReach = Math.round(dummy.actualReach * scaleFactor);
           }
           gMap[sa] = dummy;
         });
@@ -5184,6 +5384,8 @@ const Dashboard = ({
             dummy.actualActivity = Math.round(dummy.actualActivity * scaleFactor);
             dummy.budgetNominal = Math.round(dummy.budgetNominal * scaleFactor);
             dummy.actualNominal = Math.round(dummy.actualNominal * scaleFactor);
+            dummy.budgetReach = Math.round(dummy.budgetReach * scaleFactor);
+            dummy.actualReach = Math.round(dummy.actualReach * scaleFactor);
           }
           gMap[hyb] = dummy;
         });
@@ -5201,6 +5403,8 @@ const Dashboard = ({
             dummy.actualActivity = Math.round(dummy.actualActivity * scaleFactor);
             dummy.budgetNominal = Math.round(dummy.budgetNominal * scaleFactor);
             dummy.actualNominal = Math.round(dummy.actualNominal * scaleFactor);
+            dummy.budgetReach = Math.round(dummy.budgetReach * scaleFactor);
+            dummy.actualReach = Math.round(dummy.actualReach * scaleFactor);
           }
           gMap[act] = dummy;
         });
@@ -5288,6 +5492,8 @@ const Dashboard = ({
               actualActivity: 0,
               budgetNominal: 0,
               actualNominal: 0,
+              budgetReach: 0,
+              actualReach: 0,
             };
           }
           gMap[gVal].pog += Number(item.pog || 0);
@@ -5304,6 +5510,8 @@ const Dashboard = ({
           return b.budgetActivity - a.budgetActivity;
         } else if (overviewMetricFilter === "nominal") {
           return b.budgetNominal - a.budgetNominal;
+        } else if (overviewMetricFilter === "reach") {
+          return b.budgetReach - a.budgetReach;
         } else if (overviewMetricFilter === "movement") {
           return b.sellIn + b.pog - (a.sellIn + a.pog);
         } else if (overviewMetricFilter === "idle") {
@@ -5347,7 +5555,7 @@ const Dashboard = ({
       "Mulyono", "Setiawan", "Herianto", "Bambang", "Edi Purwanto", "Wawan"
     ];
     const SEG_HYBRIDS_LIST = ["JAGO", "RUBY", "JALU", "GANESH"];
-    const SEG_ACTIVITIES_LIST = ["FFD", "FM", "ODP", "SFT"];
+    const SEG_ACTIVITIES_LIST = ["FFD", "FM", "ODP", "SFT", "BFFD", "BFM", "BFT", "BC", "CRV", "EXP", "PT"];
 
     activeKiosks.forEach((k) => {
       let groupName = "Uncategorized";
@@ -5426,7 +5634,14 @@ const Dashboard = ({
           { name: "FFD", actual: 64, budget: 70 },
           { name: "FM", actual: 48, budget: 55 },
           { name: "ODP", actual: 36, budget: 40 },
-          { name: "SFT", actual: 22, budget: 25 }
+          { name: "SFT", actual: 22, budget: 25 },
+          { name: "BFFD", actual: 18, budget: 20 },
+          { name: "BFM", actual: 32, budget: 35 },
+          { name: "BFT", actual: 12, budget: 15 },
+          { name: "BC", actual: 50, budget: 60 },
+          { name: "CRV", actual: 28, budget: 30 },
+          { name: "EXP", actual: 10, budget: 12 },
+          { name: "PT", actual: 45, budget: 50 }
         ];
       }
     }
@@ -6365,16 +6580,29 @@ const Dashboard = ({
 
     const parseDate = (timestamp: any) => {
       if (!timestamp) return null;
-      let d;
-      if (typeof timestamp === "string" && timestamp.includes("/")) {
-        const parts = timestamp.split(/[\s/:]+/);
-        if (parts.length >= 3) {
-          d = new Date(
-            `${parts[2]}-${parts[1]}-${parts[0]}T${parts[3] || "00"}:${parts[4] || "00"}:${parts[5] || "00"}`,
-          );
-        } else d = new Date(timestamp);
-      } else {
-        d = new Date(timestamp);
+      if (timestamp instanceof Date) return timestamp;
+      let d = new Date(timestamp);
+      if (!isNaN(d.getTime())) return d;
+
+      if (typeof timestamp === "string") {
+        const isSlash = timestamp.includes("/");
+        const isDash = timestamp.includes("-");
+        if (isSlash || isDash) {
+          const parts = timestamp.split(/[\s/:-]+/);
+          if (parts.length >= 3) {
+            if (parts[0].length === 4) {
+              const dStr = `${parts[0]}-${parts[1]}-${parts[2]}T${parts[3] || "00"}:${parts[4] || "00"}:${parts[5] || "00"}`;
+              d = new Date(dStr);
+            } else {
+              let year = parts[2];
+              if (year.length === 2 && !isNaN(Number(year))) {
+                year = "20" + year;
+              }
+              const dStr = `${year}-${parts[1]}-${parts[0]}T${parts[3] || "00"}:${parts[4] || "00"}:${parts[5] || "00"}`;
+              d = new Date(dStr);
+            }
+          }
+        }
       }
       return d && !isNaN(d.getTime()) ? d : null;
     };
@@ -8729,14 +8957,19 @@ const Dashboard = ({
         <div className="animate-in fade-in slide-in-from-right-4 duration-300">
           {/* Header */}
           <div className="mb-2 ml-1 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-lg font-semibold text-[#181a2c] tracking-tight">
-                Executive{" "}
-                <span className="text-primary font-bold">Overview</span>
-              </h1>
-              <p className="text-[11px] text-[#8E94B7] font-semibold uppercase tracking-wider mt-0.5">
-                Analisis Kinerja & Pemantauan Tingkat Nasional
-              </p>
+            <div className="flex items-center gap-3">
+              <div className="size-10 rounded-2xl bg-[#154be2]/10 flex items-center justify-center shrink-0 border border-[#154be2]/20">
+                <User className="size-5 text-[#154be2]" />
+              </div>
+              <div>
+                <h1 className="text-lg font-semibold text-[#181a2c] tracking-tight">
+                  Executive{" "}
+                  <span className="text-primary font-bold">Overview</span>
+                </h1>
+                <p className="text-[11px] text-[#8E94B7] font-semibold uppercase tracking-wider mt-0.5">
+                  Analisis Kinerja & Pemantauan Tingkat Nasional
+                </p>
+              </div>
             </div>
 
             {/* Metrik Selector Buttons (Sejajar dengan Title, Rata Kanan) */}
@@ -8761,6 +8994,16 @@ const Dashboard = ({
                   }`}
                 >
                   Nominal
+                </button>
+                <button
+                  onClick={() => setOverviewMetricFilter("reach")}
+                  className={`px-6 py-3 rounded-xl text-sm font-black transition-all duration-200 ${
+                    overviewMetricFilter === "reach"
+                      ? "bg-[#154be2] text-white shadow-[0_4px_12px_rgba(21,75,226,0.25)]"
+                      : "text-[#5c648e] hover:text-[#181a2c] hover:bg-slate-200"
+                  }`}
+                >
+                  Reach
                 </button>
               </div>
             </div>
@@ -8803,48 +9046,116 @@ const Dashboard = ({
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 lg:gap-5">
-                {/* Filter 2 - Month */}
-                <div className="flex flex-col gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4 lg:gap-5">
+                {/* Filter 2 - Month (Multi-Select Dropdown) */}
+                <div className="flex flex-col gap-2" ref={monthDropdownRef}>
                   <label className="text-[10px] lg:text-[11px] font-bold text-[#8E94B7] uppercase tracking-wider">
                     Bulan
                   </label>
                   <div className="relative">
-                    <select
-                      value={filterBelowMonth}
-                      onChange={(e) => setFilterBelowMonth(e.target.value)}
-                      className="w-full bg-[#fbfaff] border border-[#e2e8f0] rounded-xl px-4 py-3 text-xs lg:text-sm font-bold text-[#181a2c] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none cursor-pointer pr-10"
+                    <button
+                      type="button"
+                      onClick={() => setIsMonthDropdownOpen(!isMonthDropdownOpen)}
+                      className="w-full bg-[#fbfaff] border border-[#e2e8f0] rounded-xl px-2.5 lg:px-4 py-3 text-[11px] lg:text-xs font-bold text-[#181a2c] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-left flex items-center justify-between shadow-sm cursor-pointer"
                     >
-                      <option value="All">Semua Bulan</option>
-                      {filterOptions.months.map((m) => (
-                        <option key={m} value={m}>
-                          {m}
-                        </option>
-                      ))}
-                    </select>
-                    <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[18px] text-[#8E94B7] pointer-events-none">
-                      expand_more
-                    </span>
+                      <span className="truncate pr-2">
+                        {filterBelowMonth.length === 0
+                          ? "Semua Bulan"
+                          : filterBelowMonth.length === filterOptions.months.length
+                          ? "Semua Bulan"
+                          : filterBelowMonth.length <= 2
+                          ? filterBelowMonth.join(", ")
+                          : `${filterBelowMonth.length} Bulan Terpilih`}
+                      </span>
+                      <span 
+                        className="material-symbols-outlined text-[18px] text-[#8E94B7] transition-transform duration-200"
+                        style={{ transform: isMonthDropdownOpen ? 'rotate(180deg)' : 'none' }}
+                      >
+                        expand_more
+                      </span>
+                    </button>
+
+                    {isMonthDropdownOpen && (
+                      <div className="absolute left-0 mt-2 bg-white border border-[#e2e8f0] rounded-2xl shadow-xl z-50 max-h-60 overflow-y-auto p-2.5 flex flex-col gap-1.5 scrollbar-thin min-w-[185px] w-max max-w-[240px]">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (filterBelowMonth.length > 0) {
+                              setFilterBelowMonth([]);
+                            } else {
+                              setFilterBelowMonth([...filterOptions.months]);
+                            }
+                          }}
+                          className="flex items-center gap-2.5 px-3 py-2 text-left hover:bg-slate-50 rounded-lg transition-colors cursor-pointer w-full text-xs font-semibold"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={filterBelowMonth.length === filterOptions.months.length}
+                            onChange={() => {}} // Handled by button click
+                            className="rounded text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer accent-[#154be2]"
+                          />
+                          <span className="text-[#181a2c] font-extrabold uppercase tracking-wide text-[10px]">
+                            {filterBelowMonth.length > 0 ? "Reset Pilihan" : "Pilih Semua"}
+                          </span>
+                        </button>
+                        <div className="border-t border-slate-100 my-1"></div>
+                        {filterOptions.months.map((m) => {
+                          const isChecked = filterBelowMonth.includes(m);
+                          return (
+                            <button
+                              key={m}
+                              type="button"
+                              onClick={() => {
+                                if (isChecked) {
+                                  setFilterBelowMonth(filterBelowMonth.filter((item) => item !== m));
+                                } else {
+                                  setFilterBelowMonth([...filterBelowMonth, m]);
+                                }
+                              }}
+                              className="flex items-center gap-2.5 px-3 py-2 text-left hover:bg-slate-50 rounded-lg transition-colors cursor-pointer w-full text-xs"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {}} // Handled by button click
+                                className="rounded text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer accent-[#154be2]"
+                              />
+                              <span className="text-slate-700 font-semibold">{m}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {/* Filter 2 - Channel */}
+                {/* Filter 2 - Activity */}
                 <div className="flex flex-col gap-2">
                   <label className="text-[10px] lg:text-[11px] font-bold text-[#8E94B7] uppercase tracking-wider">
-                    Channel
+                    Activity
                   </label>
                   <div className="relative">
                     <select
-                      value={filterBelowChannel}
-                      onChange={(e) => setFilterBelowChannel(e.target.value)}
-                      className="w-full bg-[#fbfaff] border border-[#e2e8f0] rounded-xl px-4 py-3 text-xs lg:text-sm font-bold text-[#181a2c] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none cursor-pointer pr-10"
+                      value={activeActivityFilter || "All"}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setActiveActivityFilter(val === "All" ? null : val);
+                      }}
+                      className="w-full bg-[#fbfaff] border border-[#e2e8f0] rounded-xl px-2.5 lg:px-4 py-3 text-[11px] lg:text-xs font-bold text-[#181a2c] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none cursor-pointer pr-10"
                     >
-                      <option value="All">Semua Channel</option>
-                      {filterOptions.channels.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
+                      <option value="All">Semua Activity</option>
+                      {(() => {
+                        const REGULAR_LIST = ["FFD", "FM", "ODP", "SFT", "BC", "PT"];
+                        const ADHOC_LIST = ["BFFD", "BFM", "BFT", "CRV", "EXP"];
+                        let list = ["FFD", "FM", "ODP", "SFT", "BFFD", "BFM", "BFT", "BC", "CRV", "EXP", "PT"];
+                        if (filterBelowType === "Regular") list = REGULAR_LIST;
+                        if (filterBelowType === "AdHoc") list = ADHOC_LIST;
+                        return list.map((act) => (
+                          <option key={act} value={act}>
+                            {act} - {getActivityFullName(act)}
+                          </option>
+                        ));
+                      })()}
                     </select>
                     <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[18px] text-[#8E94B7] pointer-events-none">
                       expand_more
@@ -8861,7 +9172,7 @@ const Dashboard = ({
                     <select
                       value={filterBelowMaterial}
                       onChange={(e) => setFilterBelowMaterial(e.target.value)}
-                      className="w-full bg-[#fbfaff] border border-[#e2e8f0] rounded-xl px-4 py-3 text-xs lg:text-sm font-bold text-[#181a2c] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none cursor-pointer pr-10"
+                      className="w-full bg-[#fbfaff] border border-[#e2e8f0] rounded-xl px-2.5 lg:px-4 py-3 text-[11px] lg:text-xs font-bold text-[#181a2c] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none cursor-pointer pr-10"
                     >
                       <option value="All">Semua Hybrid</option>
                       {filterOptions.materials.map((m) => (
@@ -8885,7 +9196,7 @@ const Dashboard = ({
                     <select
                       value={filterBelowTeam}
                       onChange={(e) => setFilterBelowTeam(e.target.value)}
-                      className="w-full bg-[#fbfaff] border border-[#e2e8f0] rounded-xl px-4 py-3 text-xs lg:text-sm font-bold text-[#181a2c] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none cursor-pointer pr-10"
+                      className="w-full bg-[#fbfaff] border border-[#e2e8f0] rounded-xl px-2.5 lg:px-4 py-3 text-[11px] lg:text-xs font-bold text-[#181a2c] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none cursor-pointer pr-10"
                     >
                       <option value="All">Semua PIC</option>
                       {filterOptions.teams.map((t) => (
@@ -8909,7 +9220,7 @@ const Dashboard = ({
                     <select
                       value={filterBelowArea}
                       onChange={(e) => setFilterBelowArea(e.target.value)}
-                      className="w-full bg-[#fbfaff] border border-[#e2e8f0] rounded-xl px-4 py-3 text-xs lg:text-sm font-bold text-[#181a2c] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none cursor-pointer pr-10"
+                      className="w-full bg-[#fbfaff] border border-[#e2e8f0] rounded-xl px-2.5 lg:px-4 py-3 text-[11px] lg:text-xs font-bold text-[#181a2c] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none cursor-pointer pr-10"
                     >
                       <option value="All">Semua Wilayah</option>
                       {filterOptions.areas.map((a) => (
@@ -8933,7 +9244,7 @@ const Dashboard = ({
                     <select
                       value={filterBelowCrop}
                       onChange={(e) => setFilterBelowCrop(e.target.value)}
-                      className="w-full bg-[#fbfaff] border border-[#e2e8f0] rounded-xl px-4 py-3 text-xs lg:text-sm font-bold text-[#181a2c] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none cursor-pointer pr-10"
+                      className="w-full bg-[#fbfaff] border border-[#e2e8f0] rounded-xl px-2.5 lg:px-4 py-3 text-[11px] lg:text-xs font-bold text-[#181a2c] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none cursor-pointer pr-10"
                     >
                       <option value="All">Semua Crop</option>
                       {["Field Corn", "Fresh Corn", "Vegetables"].map((crop) => (
@@ -8941,6 +9252,27 @@ const Dashboard = ({
                           {crop}
                         </option>
                       ))}
+                    </select>
+                    <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[18px] text-[#8E94B7] pointer-events-none">
+                      expand_more
+                    </span>
+                  </div>
+                </div>
+
+                {/* Filter 2 - Type */}
+                <div className="flex flex-col gap-2">
+                  <label className="text-[10px] lg:text-[11px] font-bold text-[#8E94B7] uppercase tracking-wider">
+                    Type
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={filterBelowType}
+                      onChange={(e) => setFilterBelowType(e.target.value)}
+                      className="w-full bg-[#fbfaff] border border-[#e2e8f0] rounded-xl px-2.5 lg:px-4 py-3 text-[11px] lg:text-xs font-bold text-[#181a2c] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none cursor-pointer pr-10"
+                    >
+                      <option value="All">Regular & AdHoc</option>
+                      <option value="Regular">Regular Only</option>
+                      <option value="AdHoc">AdHoc Only</option>
                     </select>
                     <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[18px] text-[#8E94B7] pointer-events-none">
                       expand_more
@@ -8956,9 +9288,9 @@ const Dashboard = ({
           </div>
 
           {/* Charts Grid Row 1 */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-11 gap-6 mb-6">
             {/* Chart 1: Sales (POG) & Stock per Area / Dimension */}
-            <div className="lg:col-span-2 bg-white p-4 lg:p-5 rounded-[48px] shadow-[0_12px_32px_rgba(21,75,226,0.18)] border border-[#154be2]/8 flex flex-col gap-0">
+            <div className="lg:col-span-7 bg-white p-4 lg:p-5 rounded-[48px] shadow-[0_12px_32px_rgba(21,75,226,0.18)] border border-[#154be2]/8 flex flex-col gap-0 h-fit">
               <div className="flex flex-col gap-1 mb-1 pb-1 border-b border-[#f0effc]/60">
                 <div className="flex items-start justify-between">
                   <div>
@@ -8981,14 +9313,14 @@ const Dashboard = ({
                       </button>
                       <h3 className="text-xs font-bold text-[#181a2c] tracking-tight">
                         {overviewGroupDimension === "area"
-                          ? "Performa Kinerja Wilayah (Area)"
+                          ? "Budget Effectiveness Wilayah (Area)"
                           : overviewGroupDimension === "province"
-                            ? "Performa Kinerja per Provinsi"
+                            ? "Budget Effectiveness per Provinsi"
                             : overviewGroupDimension === "sales_agronomist"
-                              ? "Performa Kinerja Sales Agronomist (SA)"
+                              ? "Budget Effectiveness Sales Agronomist (SA)"
                               : overviewGroupDimension === "hybrid" || overviewGroupDimension === "material"
-                                ? "Performa Kinerja per Hybrid"
-                                : "Performa Kinerja per Activity"}
+                                ? "Budget Effectiveness per Hybrid"
+                                : "Budget Effectiveness per Activity"}
                       </h3>
                     </div>
                   </div>
@@ -9050,19 +9382,29 @@ const Dashboard = ({
 
 
                   {/* Legend aligned side-by-side */}
-                  <div className="flex items-center gap-3 bg-[#fbfaff] px-2.5 py-1 rounded-xl border border-[#e2e8f0]/40 shrink-0 ml-auto">
-                    <div className="flex items-center gap-1.5">
-                      <span className="size-2.5 rounded-[4px] bg-gradient-to-tr from-[#154be2] to-[#3b82f6]" />
-                      <span className="text-[10px] font-extrabold text-[#4e5572]">
+                  <div className="flex items-center gap-4 bg-[#fbfaff] px-3.5 py-1.5 rounded-xl border border-[#e2e8f0]/40 shrink-0 ml-auto select-none">
+                    <button
+                      type="button"
+                      onClick={() => setShowBudgetBar(prev => !prev)}
+                      className={`flex items-center gap-2 hover:opacity-85 transition-all cursor-pointer ${!showBudgetBar ? "opacity-35 line-through" : ""}`}
+                      title="Klik untuk menyembunyikan/menampilkan Budget"
+                    >
+                      <span className="size-3.5 rounded-[4px] bg-gradient-to-tr from-[#154be2] to-[#3b82f6]" />
+                      <span className="text-[12px] font-extrabold text-[#4e5572]">
                         Budget
                       </span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="size-2.5 rounded-[4px] bg-gradient-to-tr from-[#06b6d4] to-[#22d3ee]" />
-                      <span className="text-[10px] font-extrabold text-[#4e5572]">
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowActualBar(prev => !prev)}
+                      className={`flex items-center gap-2 hover:opacity-85 transition-all cursor-pointer ${!showActualBar ? "opacity-35 line-through" : ""}`}
+                      title="Klik untuk menyembunyikan/menampilkan Actual"
+                    >
+                      <span className="size-3.5 rounded-[4px] bg-gradient-to-tr from-[#06b6d4] to-[#22d3ee]" />
+                      <span className="text-[12px] font-extrabold text-[#4e5572]">
                         Actual
                       </span>
-                    </div>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -9079,9 +9421,22 @@ const Dashboard = ({
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={overviewStats.areaChartData}
-                      margin={{ top: 12, right: 10, left: -10, bottom: 0 }}
+                      margin={{ top: 38, right: 10, left: -10, bottom: 0 }}
                       barGap={currentBarGap}
                       barCategoryGap={currentBarCategoryGap}
+                      onMouseMove={(state) => {
+                        if (state && state.activeLabel) {
+                          setHoveredLabel(state.activeLabel);
+                          if (state.activeLabel !== dismissedTooltipLabel) {
+                            setDismissedTooltipLabel(null);
+                          }
+                        } else {
+                          setHoveredLabel(null);
+                        }
+                      }}
+                      onMouseLeave={() => {
+                        setHoveredLabel(null);
+                      }}
                     >
                       <defs>
                         <linearGradient
@@ -9112,12 +9467,12 @@ const Dashboard = ({
                           <stop
                             offset="0%"
                             stopColor="#06b6d4"
-                            stopOpacity={0.95}
+                            stopOpacity={1.0}
                           />
                           <stop
                             offset="100%"
                             stopColor="#22d3ee"
-                            stopOpacity={0.7}
+                            stopOpacity={1.0}
                           />
                         </linearGradient>
                       </defs>
@@ -9128,41 +9483,30 @@ const Dashboard = ({
                       />
                       <XAxis
                         dataKey="name"
-                        tick={<CustomXAxisTick />}
+                        tick={<CustomXAxisTick chartData={overviewStats.areaChartData} metricType={overviewMetricFilter} />}
                         axisLine={false}
                         tickLine={false}
                         interval={0}
-                        height={45}
+                        height={65}
                       />
                       <YAxis
                         hide={true}
+                        domain={[0, (dataMax: any) => (dataMax === 0 ? 100 : Math.round(dataMax * 1.25))]}
                         tick={{ fill: "#8E94B7", fontSize: 9, fontWeight: 500 }}
                         axisLine={false}
                         tickLine={false}
                       />
                       <Tooltip
                         cursor={{ fill: "rgba(21, 75, 226, 0.03)" }}
-                        contentStyle={{
-                          backgroundColor: "white",
-                          borderRadius: "16px",
-                          border: "1px solid #edecff",
-                          boxShadow: "0 12px 32px rgba(21,75,226,0.1)",
-                        }}
-                        labelStyle={{
-                          fontSize: "11px",
-                          fontWeight: "bold",
-                          color: "#181a2c",
-                        }}
-                        itemStyle={{ fontSize: "10px", padding: "1px 0" }}
-                        formatter={(value: any, name: any) => {
-                          if (value === undefined || value === null || isNaN(Number(value))) return [value, name];
-                          return [Math.round(Number(value)).toLocaleString("id-ID"), name];
-                        }}
+                        content={<CustomChartTooltip metricType={overviewMetricFilter} dismissedLabel={dismissedTooltipLabel} />}
                       />
                       <Bar
+                        hide={!showBudgetBar}
                         dataKey={
                           overviewMetricFilter === "activity"
                             ? "budgetActivity"
+                            : overviewMetricFilter === "reach"
+                            ? "budgetReach"
                             : "budgetNominal"
                         }
                         name="Budget"
@@ -9172,13 +9516,20 @@ const Dashboard = ({
                         background={<CustomBarBackground data={overviewStats.areaChartData} activeKey={activeMainBarKey} />}
                       >
                         {overviewStats.areaChartData.map((entry: any, index: number) => {
+                          const isActive = activeMainBarKey === entry.name;
                           return (
                             <Cell
                               key={`cell-budget-${index}`}
                               cursor="pointer"
-                              fill="url(#colorAreaPog)"
+                              fill={isActive ? "#ea580c" : "url(#colorAreaPog)"}
                               fillOpacity={1.0}
                               onClick={() => {
+                                clickedBarRef.current = true;
+                                if (activeMainBarKey === entry.name) {
+                                  setDismissedTooltipLabel(entry.name);
+                                } else {
+                                  setDismissedTooltipLabel(null);
+                                }
                                 setActiveMainBarKey(prev => prev === entry.name ? null : entry.name);
                               }}
                             />
@@ -9188,33 +9539,20 @@ const Dashboard = ({
                           dataKey={
                             overviewMetricFilter === "activity"
                               ? "budgetActivity"
+                              : overviewMetricFilter === "reach"
+                              ? "budgetReach"
                               : "budgetNominal"
                           }
-                          position="top"
-                          offset={8}
-                          style={{
-                            fontSize: 9,
-                            fontWeight: 700,
-                            fill: "#154be2",
-                            fontFamily: "sans-serif",
-                          }}
-                          formatter={(val: any) => {
-                            if (val === undefined || val === null || isNaN(Number(val))) return "";
-                            const num = Number(val);
-                            if (num === 0) return "0";
-                            if (overviewMetricFilter === "nominal") {
-                              if (num >= 1000000000) return (num / 1000000000).toFixed(1) + " M";
-                              if (num >= 1000000) return (num / 1000000).toFixed(0) + " Jt";
-                              return Math.round(num).toLocaleString();
-                            }
-                            return Math.round(num).toLocaleString();
-                          }}
+                          content={<CustomBudgetLabel metricType={overviewMetricFilter} />}
                         />
                       </Bar>
                       <Bar
+                        hide={!showActualBar}
                         dataKey={
                           overviewMetricFilter === "activity"
                             ? "actualActivity"
+                            : overviewMetricFilter === "reach"
+                            ? "actualReach"
                             : "actualNominal"
                         }
                         name="Actual"
@@ -9224,13 +9562,20 @@ const Dashboard = ({
                         background={<CustomBarBackground data={overviewStats.areaChartData} activeKey={activeMainBarKey} />}
                       >
                         {overviewStats.areaChartData.map((entry: any, index: number) => {
+                          const isActive = activeMainBarKey === entry.name;
                           return (
                             <Cell
                               key={`cell-actual-${index}`}
                               cursor="pointer"
-                              fill="url(#colorAreaStock)"
+                              fill={isActive ? "#f97316" : "url(#colorAreaStock)"}
                               fillOpacity={1.0}
                               onClick={() => {
+                                clickedBarRef.current = true;
+                                if (activeMainBarKey === entry.name) {
+                                  setDismissedTooltipLabel(entry.name);
+                                } else {
+                                  setDismissedTooltipLabel(null);
+                                }
                                 setActiveMainBarKey(prev => prev === entry.name ? null : entry.name);
                               }}
                             />
@@ -9240,27 +9585,11 @@ const Dashboard = ({
                           dataKey={
                             overviewMetricFilter === "activity"
                               ? "actualActivity"
+                              : overviewMetricFilter === "reach"
+                              ? "actualReach"
                               : "actualNominal"
                           }
-                          position="top"
-                          offset={8}
-                          style={{
-                            fontSize: 9,
-                            fontWeight: 700,
-                            fill: "#0a90a6",
-                            fontFamily: "sans-serif",
-                          }}
-                          formatter={(val: any) => {
-                            if (val === undefined || val === null || isNaN(Number(val))) return "";
-                            const num = Number(val);
-                            if (num === 0) return "0";
-                            if (overviewMetricFilter === "nominal") {
-                              if (num >= 1000000000) return (num / 1000000000).toFixed(1) + " M";
-                              if (num >= 1000000) return (num / 1000000).toFixed(0) + " Jt";
-                              return Math.round(num).toLocaleString();
-                            }
-                            return Math.round(num).toLocaleString();
-                          }}
+                          content={<CustomActualLabel metricType={overviewMetricFilter} />}
                         />
                       </Bar>
                     </BarChart>
@@ -9287,14 +9616,14 @@ const Dashboard = ({
                       </button>
                       <h3 className="text-[11px] font-bold text-[#181a2c] tracking-tight">
                         {subGroupDimension === "area"
-                          ? "Sub Performa Kinerja Wilayah (Area)"
+                          ? "Sub Budget Effectiveness Wilayah (Area)"
                           : subGroupDimension === "province"
-                            ? "Sub Performa Kinerja per Provinsi"
+                            ? "Sub Budget Effectiveness per Provinsi"
                             : subGroupDimension === "sales_agronomist"
-                              ? "Sub Performa Kinerja Sales Agronomist (SA)"
+                              ? "Sub Budget Effectiveness Sales Agronomist (SA)"
                               : subGroupDimension === "hybrid" || subGroupDimension === "material"
-                                ? "Sub Performa Kinerja per Hybrid"
-                                : "Sub Performa Kinerja per Activity"}
+                                ? "Sub Budget Effectiveness per Hybrid"
+                                : "Sub Budget Effectiveness per Activity"}
                       </h3>
                       {activeMainBarKey && (
                         <button
@@ -9334,9 +9663,22 @@ const Dashboard = ({
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={overviewStats.subChartData || []}
-                      margin={{ top: 12, right: 10, left: -10, bottom: 0 }}
+                      margin={{ top: 38, right: 10, left: -10, bottom: 0 }}
                       barGap={currentBarGap}
                       barCategoryGap={currentBarCategoryGap}
+                      onMouseMove={(state) => {
+                        if (state && state.activeLabel) {
+                          setHoveredLabel(state.activeLabel);
+                          if (state.activeLabel !== dismissedSubTooltipLabel) {
+                            setDismissedSubTooltipLabel(null);
+                          }
+                        } else {
+                          setHoveredLabel(null);
+                        }
+                      }}
+                      onMouseLeave={() => {
+                        setHoveredLabel(null);
+                      }}
                     >
                       <defs>
                         <linearGradient
@@ -9367,12 +9709,12 @@ const Dashboard = ({
                           <stop
                             offset="0%"
                             stopColor="#06b6d4"
-                            stopOpacity={0.95}
+                            stopOpacity={1.0}
                           />
                           <stop
                             offset="100%"
                             stopColor="#22d3ee"
-                            stopOpacity={0.7}
+                            stopOpacity={1.0}
                           />
                         </linearGradient>
                       </defs>
@@ -9383,111 +9725,113 @@ const Dashboard = ({
                       />
                       <XAxis
                         dataKey="name"
-                        tick={<CustomXAxisTick />}
+                        tick={<CustomXAxisTick chartData={overviewStats.subChartData} metricType={overviewMetricFilter} />}
                         axisLine={false}
                         tickLine={false}
                         interval={0}
-                        height={45}
+                        height={65}
                       />
                       <YAxis
                         hide={true}
+                        domain={[0, (dataMax: any) => (dataMax === 0 ? 100 : Math.round(dataMax * 1.25))]}
                         tick={{ fill: "#8E94B7", fontSize: 9, fontWeight: 500 }}
                         axisLine={false}
                         tickLine={false}
                       />
                       <Tooltip
                         cursor={{ fill: "rgba(21, 75, 226, 0.03)" }}
-                        contentStyle={{
-                          backgroundColor: "white",
-                          borderRadius: "16px",
-                          border: "1px solid #edecff",
-                          boxShadow: "0 12px 32px rgba(21,75,226,0.1)",
-                        }}
-                        labelStyle={{
-                          fontSize: "11px",
-                          fontWeight: "bold",
-                          color: "#181a2c",
-                        }}
-                        itemStyle={{ fontSize: "10px", padding: "1px 0" }}
-                        formatter={(value: any, name: any) => {
-                          if (value === undefined || value === null || isNaN(Number(value))) return [value, name];
-                          return [Math.round(Number(value)).toLocaleString("id-ID"), name];
-                        }}
+                        content={<CustomChartTooltip metricType={overviewMetricFilter} dismissedLabel={dismissedSubTooltipLabel} />}
                       />
                       <Bar
+                        hide={!showBudgetBar}
                         dataKey={
                           overviewMetricFilter === "activity"
                             ? "budgetActivity"
+                            : overviewMetricFilter === "reach"
+                            ? "budgetReach"
                             : "budgetNominal"
                         }
                         name="Budget"
                         fill="url(#colorSubPog)"
                         radius={[6, 6, 0, 0]}
                         maxBarSize={currentMaxBarSize}
+                        background={<CustomBarBackground data={overviewStats.subChartData || []} activeKey={activeSubBarKey} />}
                       >
+                        {(overviewStats.subChartData || []).map((entry: any, index: number) => {
+                          const isActive = activeSubBarKey === entry.name;
+                          return (
+                            <Cell
+                              key={`cell-sub-budget-${index}`}
+                              cursor="pointer"
+                              fill={isActive ? "#ea580c" : "url(#colorSubPog)"}
+                              fillOpacity={1.0}
+                              onClick={() => {
+                                clickedBarRef.current = true;
+                                if (activeSubBarKey === entry.name) {
+                                  setDismissedSubTooltipLabel(entry.name);
+                                } else {
+                                  setDismissedSubTooltipLabel(null);
+                                }
+                                setActiveSubBarKey(prev => prev === entry.name ? null : entry.name);
+                              }}
+                            />
+                          );
+                        })}
                         <LabelList
                           dataKey={
                             overviewMetricFilter === "activity"
                               ? "budgetActivity"
+                              : overviewMetricFilter === "reach"
+                              ? "budgetReach"
                               : "budgetNominal"
                           }
-                          position="top"
-                          offset={8}
-                          style={{
-                            fontSize: 9,
-                            fontWeight: 700,
-                            fill: "#154be2",
-                            fontFamily: "sans-serif",
-                          }}
-                          formatter={(val: any) => {
-                            if (val === undefined || val === null || isNaN(Number(val))) return "";
-                            const num = Number(val);
-                            if (num === 0) return "0";
-                            if (overviewMetricFilter === "nominal") {
-                              if (num >= 1000000000) return (num / 1000000000).toFixed(1) + " M";
-                              if (num >= 1000000) return (num / 1000000).toFixed(0) + " Jt";
-                              return Math.round(num).toLocaleString();
-                            }
-                            return Math.round(num).toLocaleString();
-                          }}
+                          content={<CustomBudgetLabel metricType={overviewMetricFilter} />}
                         />
                       </Bar>
                       <Bar
+                        hide={!showActualBar}
                         dataKey={
                           overviewMetricFilter === "activity"
                             ? "actualActivity"
+                            : overviewMetricFilter === "reach"
+                            ? "actualReach"
                             : "actualNominal"
                         }
                         name="Actual"
                         fill="url(#colorSubStock)"
                         radius={[6, 6, 0, 0]}
                         maxBarSize={currentMaxBarSize}
+                        background={<CustomBarBackground data={overviewStats.subChartData || []} activeKey={activeSubBarKey} />}
                       >
+                        {(overviewStats.subChartData || []).map((entry: any, index: number) => {
+                          const isActive = activeSubBarKey === entry.name;
+                          return (
+                            <Cell
+                              key={`cell-sub-actual-${index}`}
+                              cursor="pointer"
+                              fill={isActive ? "#f97316" : "url(#colorSubStock)"}
+                              fillOpacity={1.0}
+                              onClick={() => {
+                                clickedBarRef.current = true;
+                                if (activeSubBarKey === entry.name) {
+                                  setDismissedSubTooltipLabel(entry.name);
+                                } else {
+                                  setDismissedSubTooltipLabel(null);
+                                }
+                                setActiveSubBarKey(prev => prev === entry.name ? null : entry.name);
+                              }}
+                            />
+                          );
+                        })}
                         <LabelList
                           dataKey={
                             overviewMetricFilter === "activity"
                               ? "actualActivity"
+                              : overviewMetricFilter === "reach"
+                              ? "actualReach"
                               : "actualNominal"
                           }
-                          position="top"
-                          offset={8}
-                          style={{
-                            fontSize: 9,
-                            fontWeight: 700,
-                            fill: "#0a90a6",
-                            fontFamily: "sans-serif",
-                          }}
-                          formatter={(val: any) => {
-                            if (val === undefined || val === null || isNaN(Number(val))) return "";
-                            const num = Number(val);
-                            if (num === 0) return "0";
-                            if (overviewMetricFilter === "nominal") {
-                              if (num >= 1000000000) return (num / 1000000000).toFixed(1) + " M";
-                              if (num >= 1000000) return (num / 1000000).toFixed(0) + " Jt";
-                              return Math.round(num).toLocaleString();
-                            }
-                            return Math.round(num).toLocaleString();
-                          }}
+                          content={<CustomActualLabel metricType={overviewMetricFilter} />}
                         />
                       </Bar>
                     </BarChart>
@@ -9497,267 +9841,279 @@ const Dashboard = ({
             </div>
 
             {/* KPI Cards Stack (Replacing Segmentasi Partner) */}
-            <div className="grid grid-cols-2 gap-3 h-full lg:col-span-1">
-              {activityDonutCardsData.map((act) => {
-                const isSelected = (act.name === "TOTAL" && activeActivityFilter === null) || (activeActivityFilter === act.name);
-                return (
-                  <button
-                    key={act.name}
-                    onClick={() => {
-                      if (act.name === "TOTAL") {
-                        setActiveActivityFilter(null);
-                      } else {
-                        setActiveActivityFilter((prev) => (prev === act.name ? null : act.name));
-                      }
-                    }}
-                    className={`p-3 rounded-[22px] flex flex-row items-center justify-between relative overflow-hidden group transition-all duration-300 min-h-[90px] w-full text-left cursor-pointer border-0 ${
-                      act.name === "TOTAL" ? "col-span-2" : ""
-                    } ${
-                      isSelected
-                        ? "bg-gradient-to-r from-[#154be2] to-cyan-500 text-white shadow-[0_12px_32px_rgba(21,75,226,0.25)] scale-[1.02]"
-                        : "bg-white shadow-[0_12px_32px_rgba(21,75,226,0.18)] hover:shadow-[0_16px_40px_rgba(21,75,226,0.28)]"
-                    }`}
-                  >
-                    <div className="flex flex-col justify-between h-full z-10 min-w-0">
-                      <div>
-                        <span className={`${act.name === "TOTAL" ? "text-[11px] px-2.5 py-1" : "text-[9px] px-2 py-0.5"} font-black rounded-full uppercase tracking-wider ${
-                          isSelected
-                            ? "bg-white/20 text-white border border-white/30"
-                            : "bg-[#154be2]/10 text-[#154be2]"
-                        }`}>
-                          {act.name}
-                        </span>
-                        <h4 className={`${act.name === "TOTAL" ? "text-[14px]" : "text-[11px]"} font-extrabold mt-1.5 leading-tight truncate max-w-[180px] ${
-                          isSelected ? "text-white" : "text-[#181a2c]"
-                        }`} title={act.fullName}>
-                          {act.fullName}
-                        </h4>
+            <div className="lg:col-span-4 flex flex-col h-full min-h-0">
+              <div className="flex flex-col gap-3.5 overflow-y-auto max-h-[460px] lg:max-h-[660px] lg:h-[660px] pl-4 pr-5 lg:pl-5 lg:pr-6.5 py-4.5 scrollbar-thin">
+                {activityDonutCardsData.map((act) => {
+                  const isSelected = (act.name === "TOTAL" && activeActivityFilter === null) || (activeActivityFilter === act.name);
+                  const isNominal = overviewMetricFilter === "nominal";
+                  const gap = act.actual - act.budget;
+                  const gapSign = gap > 0 ? "+" : "";
+
+                  let gapStr = "";
+                  if (isNominal) {
+                    const absGap = Math.abs(gap);
+                    if (absGap >= 1000000000) gapStr = `${gapSign}${(gap / 1000000000).toFixed(1)}M`;
+                    else if (absGap >= 1000000) gapStr = `${gapSign}${(gap / 1000000).toFixed(0)}Jt`;
+                    else gapStr = `${gapSign}${gap.toLocaleString()}`;
+                  } else {
+                    gapStr = `${gapSign}${gap}`;
+                  }
+                  if (gap === 0) gapStr = "0";
+
+                  return (
+                    <button
+                      key={act.name}
+                      onClick={() => {
+                        if (act.name === "TOTAL") {
+                          setActiveActivityFilter(null);
+                        } else {
+                          setActiveActivityFilter((prev) => (prev === act.name ? null : act.name));
+                        }
+                      }}
+                      className={`rounded-[32px] lg:w-[94%] lg:mx-auto flex flex-row items-center justify-between relative overflow-hidden group transition-all duration-300 w-full text-left cursor-pointer border-0 ${
+                        act.name === "TOTAL"
+                          ? "min-h-[116px] py-5 px-5 lg:py-6 lg:px-6"
+                          : "min-h-[96px] py-4 px-4 lg:py-5 lg:px-4.5"
+                      } ${
+                        isSelected
+                          ? "bg-gradient-to-r from-[#154be2] to-cyan-500 text-white shadow-[0_12px_32px_rgba(21,75,226,0.25)] scale-[1.02]"
+                          : "bg-white shadow-[0_12px_32px_rgba(21,75,226,0.18)] hover:shadow-[0_16px_40px_rgba(21,75,226,0.28)]"
+                      }`}
+                    >
+                      <div className="flex flex-col justify-center z-10 min-w-0 flex-1 pr-2">
+                        <div>
+                          {/* Abbreviation above full name */}
+                          <div className="mb-0.5">
+                            <span className={`${act.name === "TOTAL" ? "text-[10px] px-2 py-0.5" : "text-[8px] px-1.5 py-0.2"} font-black rounded-md uppercase tracking-wider ${
+                              isSelected
+                                ? "bg-white/20 text-white border border-white/20"
+                                : "bg-[#154be2]/10 text-[#154be2]"
+                            }`}>
+                              {act.name}
+                            </span>
+                          </div>
+                          <h4 className={`${act.name === "TOTAL" ? "text-[16px] lg:text-[17px]" : "text-[12px] lg:text-[12.5px]"} font-black leading-tight truncate max-w-[180px] lg:max-w-[220px] ${
+                            isSelected ? "text-white" : "text-[#181a2c]"
+                          }`} title={act.fullName}>
+                            {act.fullName}
+                          </h4>
+                        </div>
+                        <div className="mt-1.5">
+                          <div className={`font-sans font-extrabold ${act.name === "TOTAL" ? "text-[12.5px] lg:text-[13px]" : "text-[12.5px] lg:text-[13.5px]"} ${isSelected ? "text-white" : ""} flex items-center gap-1.5 flex-wrap`}>
+                            <span className={isSelected ? "text-white font-black" : "text-[#06b6d4]"}>
+                              {act.actualStr}
+                            </span>
+                            <span className={isSelected ? "text-white/50" : "text-[#8E94B7]"}>
+                              /
+                            </span>
+                            <span className={isSelected ? "text-white/85" : "text-[#154be2]"}>
+                              {act.budgetStr}
+                            </span>
+                            <span className={`ml-1.5 px-2 py-0.5 rounded font-black ${
+                              act.name === "TOTAL"
+                                ? "text-[12px] lg:text-[12.5px]"
+                                : "text-[12.5px] lg:text-[13.5px]"
+                            } ${
+                              isSelected
+                                ? "bg-white/20 text-white"
+                                : gap >= 0
+                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-100/50"
+                                  : "bg-rose-50 text-rose-700 border border-rose-100/50"
+                            }`}>
+                              {gapStr}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="mt-2">
-                        <p className={`text-[8px] font-black uppercase tracking-wider leading-none mb-1 ${
-                          isSelected ? "text-white/70" : "text-[#8E94B7]"
-                        }`}>
-                          ACTUAL / BUDGET
-                        </p>
-                        <div className={`font-sans font-extrabold text-[11px] ${isSelected ? "text-white" : ""}`}>
-                          <span className={isSelected ? "text-white" : act.name === "TOTAL" ? "text-[#154be2]" : "text-[#06b6d4]"}>
-                            {act.actualStr}
-                          </span>
-                          <span className={isSelected ? "text-white/50 mx-0.5" : "text-[#8E94B7] mx-0.5"}>
-                            /
-                          </span>
-                          <span className={isSelected ? "text-white/80" : "text-[#5c648e]"}>
-                            {act.budgetStr}
-                          </span>
+   
+                      {/* Enriched Donut Chart Wrapper */}
+                      <div className="flex flex-col items-center justify-center shrink-0 z-10 pl-1">
+                        {/* Donut Chart Visual */}
+                        <div className={`relative shrink-0 ${act.name === "TOTAL" ? "size-22" : "size-18"}`}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie
+                                data={act.chartData}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={act.name === "TOTAL" ? 28 : 22}
+                                outerRadius={act.name === "TOTAL" ? 38 : 31}
+                                startAngle={90}
+                                endAngle={-270}
+                                paddingAngle={1}
+                                dataKey="value"
+                              >
+                                {act.chartData.map((entry, idx) => {
+                                  let fill = entry.fill;
+                                  if (isSelected) {
+                                    fill = entry.name === "Actual" ? "#ffffff" : "rgba(255,255,255,0.25)";
+                                  } else {
+                                    if (act.name === "TOTAL" && entry.name === "Actual") {
+                                      fill = "#06b6d4";
+                                    }
+                                  }
+                                  return <Cell key={`cell-${idx}`} fill={fill} />;
+                                })}
+                              </Pie>
+                            </PieChart>
+                          </ResponsiveContainer>
+                          {/* Center percentage indicator */}
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <span className={`font-black ${
+                              act.name === "TOTAL"
+                                ? "text-[14px]"
+                                : "text-[11.5px]"
+                            } ${
+                              isSelected ? "text-white" : act.name === "TOTAL" ? "text-[#154be2]" : "text-[#181a2c]"
+                            }`}>
+                              {act.percentage}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+                                                  {/* Section: Conversion Sales Rate */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            {/* Left: Conversion Sales Rate by Activity */}
+            <div className="bg-white p-6 rounded-[40px] shadow-[0_12px_32px_rgba(21,75,226,0.18)] border border-[#154be2]/8 flex flex-col justify-between mt-6 lg:mt-8">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-sm font-semibold">
+                      swap_horiz
+                    </span>
+                    <h3 className="text-xs font-bold text-[#181a2c] tracking-tight">
+                      Conversion Sales Rate (Activity)
+                    </h3>
+                  </div>
+                  <p className="text-[10px] text-[#8E94B7] mt-0.5">
+                    Pilih filter untuk melihat impact konversi
+                  </p>
+                </div>
+
+                {/* Filter Selection */}
+                <select 
+                  className="bg-[#f0effc] text-[#181a2c] text-[10px] font-semibold px-3 py-1.5 rounded-lg border-none outline-none cursor-pointer shrink-0"
+                  value={conversionActivityFilter}
+                  onChange={(e) => setConversionActivityFilter(e.target.value)}
+                >
+                  <option value="activity">Activity</option>
+                  <option value="area">Area</option>
+                  <option value="province">Province</option>
+                  <option value="Sales Agronomist">Sales Agronomist</option>
+                  <option value="Hybrids">Hybrids</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-3 mt-4">
+                {[
+                  { name: conversionActivityFilter === "area" ? "Area 1" : conversionActivityFilter === "province" ? "Jawa Timur" : conversionActivityFilter === "Sales Agronomist" ? "Budi" : conversionActivityFilter === "Hybrids" ? "NK 212" : "Farmer Meeting", rate: conversionActivityFilter === "area" ? 82 : conversionActivityFilter === "province" ? 78 : conversionActivityFilter === "Sales Agronomist" ? 85 : conversionActivityFilter === "Hybrids" ? 90 : 68, budget: 150000, sales: 102000 },
+                  { name: conversionActivityFilter === "area" ? "Area 2" : conversionActivityFilter === "province" ? "Jawa Tengah" : conversionActivityFilter === "Sales Agronomist" ? "Agus" : conversionActivityFilter === "Hybrids" ? "NK 6172" : "Demo Plot", rate: conversionActivityFilter === "area" ? 64 : conversionActivityFilter === "province" ? 65 : conversionActivityFilter === "Sales Agronomist" ? 72 : conversionActivityFilter === "Hybrids" ? 75 : 54, budget: 120000, sales: 64800 },
+                  { name: conversionActivityFilter === "area" ? "Area 3" : conversionActivityFilter === "province" ? "Jawa Barat" : conversionActivityFilter === "Sales Agronomist" ? "Joko" : conversionActivityFilter === "Hybrids" ? "NK 7328" : "Field Day", rate: conversionActivityFilter === "area" ? 55 : conversionActivityFilter === "province" ? 58 : conversionActivityFilter === "Sales Agronomist" ? 60 : conversionActivityFilter === "Hybrids" ? 65 : 45, budget: 100000, sales: 45000 },
+                  { name: conversionActivityFilter === "area" ? "Area 4" : conversionActivityFilter === "province" ? "Sumatera Utara" : conversionActivityFilter === "Sales Agronomist" ? "Rudi" : conversionActivityFilter === "Hybrids" ? "NK 33" : "Kiosk Visit", rate: conversionActivityFilter === "area" ? 42 : conversionActivityFilter === "province" ? 45 : conversionActivityFilter === "Sales Agronomist" ? 48 : conversionActivityFilter === "Hybrids" ? 52 : 32, budget: 200000, sales: 64000 },
+                  { name: conversionActivityFilter === "area" ? "Area 5" : conversionActivityFilter === "province" ? "Sulawesi Selatan" : conversionActivityFilter === "Sales Agronomist" ? "Andi" : conversionActivityFilter === "Hybrids" ? "NK 99" : "Farmer Visit", rate: conversionActivityFilter === "area" ? 25 : conversionActivityFilter === "province" ? 28 : conversionActivityFilter === "Sales Agronomist" ? 30 : conversionActivityFilter === "Hybrids" ? 35 : 21, budget: 180000, sales: 37800 },
+                ].map((item, index) => (
+                  <div 
+                    key={item.name} 
+                    onClick={() => setActiveConversionActivity(item.name)}
+                    className={`flex items-center justify-between p-3 rounded-xl border transition-all duration-200 cursor-pointer ${activeConversionActivity === item.name ? "bg-[#154be2]/5 border-[#154be2]/30 shadow-sm" : "bg-[#fbfaff] border-[#f0effc] hover:border-[#154be2]/20"}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`size-8 shrink-0 rounded-full flex items-center justify-center font-bold text-xs ${activeConversionActivity === item.name ? "bg-[#154be2] text-white" : "bg-[#154be2]/10 text-primary"}`}>
+                        #{index + 1}
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-[11px] font-bold text-[#181a2c] leading-tight truncate">{item.name}</h4>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <p className="text-[9px] text-[#8E94B7] truncate">
+                            Sales: <span className="font-semibold text-emerald-600">{Math.round(item.budget * (item.rate / 100)).toLocaleString()}</span>
+                          </p>
+                          <span className="text-[8px] text-slate-300">|</span>
+                          <p className="text-[9px] text-[#8E94B7] truncate">
+                            Budget: <span className="font-semibold text-slate-600">{item.budget.toLocaleString()}</span>
+                          </p>
                         </div>
                       </div>
                     </div>
- 
-                    {/* Donut Chart Visual */}
-                    <div className="relative size-14 shrink-0">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={act.chartData}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={18}
-                            outerRadius={25}
-                            startAngle={90}
-                            endAngle={-270}
-                            paddingAngle={1}
-                            dataKey="value"
-                          >
-                            {act.chartData.map((entry, idx) => {
-                              let fill = entry.fill;
-                              if (isSelected) {
-                                fill = entry.name === "Actual" ? "#ffffff" : "rgba(255,255,255,0.25)";
-                              } else {
-                                if (act.name === "TOTAL" && entry.name === "Actual") {
-                                  fill = "#154be2";
-                                }
-                              }
-                              return <Cell key={`cell-${idx}`} fill={fill} />;
-                            })}
-                          </Pie>
-                        </PieChart>
-                      </ResponsiveContainer>
-                      {/* Center percentage indicator */}
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <span className={`text-[9.5px] font-black ${
-                          isSelected ? "text-white" : act.name === "TOTAL" ? "text-[#154be2]" : "text-[#181a2c]"
-                        }`}>
-                          {act.percentage}%
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Section: Employee Sales Ranking (Highest & Lowest) */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            {/* Top 5 Employees - Highest Sales */}
-            <div className="bg-white p-6 rounded-[40px] shadow-[0_12px_32px_rgba(21,75,226,0.18)] border border-[#154be2]/8 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-emerald-500 text-sm font-semibold">
-                    trending_up
-                  </span>
-                  <h3 className="text-xs font-bold text-[#181a2c] tracking-tight">
-                    Top 5 Employee dengan Penjualan Tertinggi
-                  </h3>
-                </div>
-                <p className="text-[10px] text-[#8E94B7] mt-0.5">
-                  Daftar tim penjualan dengan pencapaian POG tertinggi saat ini
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-3 mt-4">
-                {employeePerformanceData.highest.map((item, index) => (
-                  <div
-                    key={item.employee}
-                    className="flex items-center justify-between p-3 rounded-xl bg-[#fbfaff] border border-[#f0effc] hover:border-[#154be2]/20 transition-all duration-200"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`size-8 shrink-0 rounded-full flex items-center justify-center font-bold text-xs ${
-                          index === 0
-                            ? "bg-amber-100 text-amber-700"
-                            : index === 1
-                              ? "bg-slate-200 text-slate-700"
-                              : index === 2
-                                ? "bg-orange-100 text-orange-700"
-                                : "bg-[#154be2]/10 text-primary"
-                        }`}
-                      >
-                        #{index + 1}
-                      </div>
-                      <div className="min-w-0">
-                        <h4 className="text-[11px] font-bold text-[#181a2c] leading-tight truncate max-w-[200px] sm:max-w-[400px]">
-                          {item.employee}
-                        </h4>
-                        <p className="text-[9px] text-[#8E94B7] mt-0.5 truncate">
-                          Area:{" "}
-                          <span className="font-semibold text-primary">
-                            {item.area}
-                          </span>
-                        </p>
-                      </div>
-                    </div>
-
                     <div className="text-right shrink-0">
-                      <p className="text-xs font-bold text-emerald-600 font-sans">
-                        {item.pog.toLocaleString()}{" "}
-                        <span className="text-[9px] text-[#8E94B7] font-normal">
-                          POG
-                        </span>
-                      </p>
-                      <p className="text-[8.5px] text-[#8E94B7] mt-0.5">
-                        Sisa stok:{" "}
-                        <span className="font-medium text-slate-700">
-                          {item.currentStock.toLocaleString()} Kg
-                        </span>
-                      </p>
+                      <p className="text-xs font-bold text-primary font-sans">{item.rate}%</p>
                     </div>
                   </div>
                 ))}
-
-                {employeePerformanceData.highest.length === 0 && (
-                  <div className="flex flex-col items-center justify-center text-center p-6">
-                    <span className="material-symbols-outlined text-[36px] text-[#8E94B7]/40 mb-2">
-                      trending_flat
-                    </span>
-                    <p className="text-xs text-[#8E94B7]">
-                      Data POG belum dimasukkan bulan ini.
-                    </p>
-                  </div>
-                )}
               </div>
             </div>
 
-            {/* Top 5 Employees - Lowest Sales */}
-            <div className="bg-white p-6 rounded-[40px] shadow-[0_12px_32px_rgba(21,75,226,0.18)] border border-[#154be2]/8 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-rose-500 text-sm font-semibold">
-                    trending_down
-                  </span>
-                  <h3 className="text-xs font-bold text-[#181a2c] tracking-tight">
-                    Top 5 Employee dengan Penjualan Terendah
-                  </h3>
+            {/* Right: Conversion Sales Rate by Filter */}
+            <div className="bg-white p-6 rounded-[40px] shadow-[0_12px_32px_rgba(21,75,226,0.18)] border border-[#154be2]/8 flex flex-col justify-between mt-6 lg:mt-8">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-sm font-semibold">
+                      filter_alt
+                    </span>
+                    <h3 className="text-xs font-bold text-[#181a2c] tracking-tight">
+                      Impact: {activeConversionActivity}
+                    </h3>
+                  </div>
+                  <p className="text-[10px] text-[#8E94B7] mt-0.5">
+                    Konversi penjualan berdasarkan filter
+                  </p>
                 </div>
-                <p className="text-[10px] text-[#8E94B7] mt-0.5">
-                  Daftar tim penjualan dengan pencapaian POG terendah saat ini
-                </p>
+                
+                {/* Filter Selection */}
+                <select 
+                  className="bg-[#f0effc] text-[#181a2c] text-[10px] font-semibold px-3 py-1.5 rounded-lg border-none outline-none cursor-pointer"
+                  value={conversionSalesFilter}
+                  onChange={(e) => setConversionSalesFilter(e.target.value)}
+                >
+                  <option value="activity">Activity</option>
+                  <option value="area">Area</option>
+                  <option value="province">Province</option>
+                  <option value="Sales Agronomist">Sales Agronomist</option>
+                  <option value="Hybrids">Hybrids</option>
+                </select>
               </div>
 
               <div className="flex flex-col gap-3 mt-4">
-                {employeePerformanceData.lowest.map((item, index) => (
-                  <div
-                    key={item.employee}
-                    className="flex items-center justify-between p-3 rounded-xl bg-[#fbfaff] border border-[#f0effc] hover:border-[#154be2]/20 transition-all duration-200"
-                  >
+                {[
+                  { name: conversionSalesFilter === "activity" ? "Farmer Meeting" : conversionSalesFilter === "area" ? "Area 1" : conversionSalesFilter === "province" ? "Jawa Timur" : conversionSalesFilter === "Sales Agronomist" ? "Budi" : "NK 212", rate: (activeConversionActivity || "").includes("1") || (activeConversionActivity || "").includes("Jawa Timur") || (activeConversionActivity || "").includes("Budi") || (activeConversionActivity || "").includes("212") || (activeConversionActivity || "").includes("Farmer Meeting") ? 75 : 45, budget: 85000, sales: 63750 },
+                  { name: conversionSalesFilter === "activity" ? "Demo Plot" : conversionSalesFilter === "area" ? "Area 2" : conversionSalesFilter === "province" ? "Jawa Tengah" : conversionSalesFilter === "Sales Agronomist" ? "Agus" : "NK 6172", rate: (activeConversionActivity || "").includes("1") || (activeConversionActivity || "").includes("Jawa Timur") || (activeConversionActivity || "").includes("Budi") || (activeConversionActivity || "").includes("212") || (activeConversionActivity || "").includes("Farmer Meeting") ? 62 : 40, budget: 70000, sales: 43400 },
+                  { name: conversionSalesFilter === "activity" ? "Field Day" : conversionSalesFilter === "area" ? "Area 3" : conversionSalesFilter === "province" ? "Jawa Barat" : conversionSalesFilter === "Sales Agronomist" ? "Joko" : "NK 7328", rate: (activeConversionActivity || "").includes("1") || (activeConversionActivity || "").includes("Jawa Timur") || (activeConversionActivity || "").includes("Budi") || (activeConversionActivity || "").includes("212") || (activeConversionActivity || "").includes("Farmer Meeting") ? 48 : 35, budget: 65000, sales: 31200 },
+                  { name: conversionSalesFilter === "activity" ? "Kiosk Visit" : conversionSalesFilter === "area" ? "Area 4" : conversionSalesFilter === "province" ? "Sumatera Utara" : conversionSalesFilter === "Sales Agronomist" ? "Rudi" : "NK 33", rate: (activeConversionActivity || "").includes("1") || (activeConversionActivity || "").includes("Jawa Timur") || (activeConversionActivity || "").includes("Budi") || (activeConversionActivity || "").includes("212") || (activeConversionActivity || "").includes("Farmer Meeting") ? 35 : 25, budget: 50000, sales: 17500 },
+                  { name: conversionSalesFilter === "activity" ? "Farmer Visit" : conversionSalesFilter === "area" ? "Area 5" : conversionSalesFilter === "province" ? "Sulawesi Selatan" : conversionSalesFilter === "Sales Agronomist" ? "Andi" : "NK 99", rate: (activeConversionActivity || "").includes("1") || (activeConversionActivity || "").includes("Jawa Timur") || (activeConversionActivity || "").includes("Budi") || (activeConversionActivity || "").includes("212") || (activeConversionActivity || "").includes("Farmer Meeting") ? 20 : 15, budget: 45000, sales: 9000 },
+                ].map((item, index) => (
+                  <div key={item.name} className="flex items-center justify-between p-3 rounded-xl bg-[#fbfaff] border border-[#f0effc] hover:border-[#154be2]/20 transition-all duration-200">
                     <div className="flex items-center gap-3">
-                      <div
-                        className={`size-8 shrink-0 rounded-full flex items-center justify-center font-bold text-xs ${
-                          index === 0
-                            ? "bg-rose-100 text-rose-700"
-                            : index === 1
-                              ? "bg-orange-50 text-orange-700 border border-orange-200"
-                              : index === 2
-                                ? "bg-orange-50 text-orange-600"
-                                : "bg-slate-100 text-slate-600"
-                        }`}
-                      >
+                      <div className="size-8 shrink-0 rounded-full flex items-center justify-center font-bold text-xs bg-[#154be2]/10 text-primary">
                         #{index + 1}
                       </div>
                       <div className="min-w-0">
-                        <h4 className="text-[11px] font-bold text-[#181a2c] leading-tight truncate max-w-[200px] sm:max-w-[400px]">
-                          {item.employee}
-                        </h4>
-                        <p className="text-[9px] text-[#8E94B7] mt-0.5 truncate">
-                          Area:{" "}
-                          <span className="font-semibold text-primary">
-                            {item.area}
-                          </span>
-                        </p>
+                        <h4 className="text-[11px] font-bold text-[#181a2c] leading-tight truncate">{item.name}</h4>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <p className="text-[9px] text-[#8E94B7] truncate">
+                            Sales: <span className="font-semibold text-emerald-600">{Math.round(item.budget * (item.rate / 100)).toLocaleString()}</span>
+                          </p>
+                          <span className="text-[8px] text-slate-300">|</span>
+                          <p className="text-[9px] text-[#8E94B7] truncate">
+                            Budget: <span className="font-semibold text-slate-600">{item.budget.toLocaleString()}</span>
+                          </p>
+                        </div>
                       </div>
                     </div>
-
                     <div className="text-right shrink-0">
-                      <p className="text-xs font-bold text-rose-600 font-sans">
-                        {item.pog.toLocaleString()}{" "}
-                        <span className="text-[9px] text-[#8E94B7] font-normal">
-                          POG
-                        </span>
-                      </p>
-                      <p className="text-[8.5px] text-[#8E94B7] mt-0.5">
-                        Sisa stok:{" "}
-                        <span className="font-medium text-slate-700">
-                          {item.currentStock.toLocaleString()} Kg
-                        </span>
-                      </p>
+                      <p className="text-xs font-bold text-primary font-sans">{item.rate}%</p>
                     </div>
                   </div>
                 ))}
-
-                {employeePerformanceData.lowest.length === 0 && (
-                  <div className="flex flex-col items-center justify-center text-center p-6">
-                    <span className="material-symbols-outlined text-[36px] text-[#8E94B7]/40 mb-2">
-                      trending_flat
-                    </span>
-                    <p className="text-xs text-[#8E94B7]">
-                      Data POG belum dimasukkan bulan ini.
-                    </p>
-                  </div>
-                )}
               </div>
             </div>
           </div>
-
+          
           {/* Section: History Bulanan */}
           <div className="bg-white p-6 rounded-[40px] shadow-[0_12px_32px_rgba(21,75,226,0.18)] border border-[#154be2]/8 flex flex-col justify-between mt-6">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 pb-4 border-b border-[#f0effc]/60 gap-4">
@@ -9767,7 +10123,7 @@ const Dashboard = ({
                     timeline
                   </span>
                   <h3 className="text-xs font-bold text-[#181a2c] tracking-tight">
-                    Tren Perkembangan Data (History Bulanan)
+                    Activity Performance Trend
                   </h3>
                 </div>
                 <p className="text-[10px] text-[#8E94B7] mt-0.5">
@@ -9776,444 +10132,207 @@ const Dashboard = ({
                 </p>
               </div>
 
-              {/* Toggle switch for history display options matching requested Opening Inv, Ending Inv, Stock In, Idle Stock, POG */}
-              <div className="flex flex-wrap items-center gap-1.5 self-start md:self-auto">
-                <button
-                  onClick={() => setHistoryChartType("opening")}
-                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
-                    historyChartType === "opening"
-                      ? "bg-indigo-600 text-white shadow-md"
-                      : "bg-[#fbfaff] text-[#8E94B7] hover:bg-slate-100 border border-slate-100/40"
-                  }`}
-                >
-                  Opening Inv
-                </button>
-                <button
-                  onClick={() => setHistoryChartType("ending")}
-                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
-                    historyChartType === "ending"
-                      ? "bg-purple-600 text-white shadow-md"
-                      : "bg-[#fbfaff] text-[#8E94B7] hover:bg-slate-100 border border-slate-100/40"
-                  }`}
-                >
-                  Ending Inv
-                </button>
-                <button
-                  onClick={() => setHistoryChartType("stockIn")}
-                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
-                    historyChartType === "stockIn"
-                      ? "bg-emerald-600 text-white shadow-md"
-                      : "bg-[#fbfaff] text-[#8E94B7] hover:bg-slate-100 border border-slate-100/40"
-                  }`}
-                >
-                  Stock In
-                </button>
-                <button
-                  onClick={() => setHistoryChartType("idle")}
-                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
-                    historyChartType === "idle"
-                      ? "bg-amber-600 text-white shadow-md"
-                      : "bg-[#fbfaff] text-[#8E94B7] hover:bg-slate-100 border border-slate-100/40"
-                  }`}
-                >
-                  Idle Stock
-                </button>
-                <button
-                  onClick={() => setHistoryChartType("pog")}
-                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
-                    historyChartType === "pog"
-                      ? "bg-blue-600 text-white shadow-md"
-                      : "bg-[#fbfaff] text-[#8E94B7] hover:bg-slate-100 border border-slate-100/40"
-                  }`}
-                >
-                  POG
-                </button>
+              {/* Metric Toggle for Trend Chart */}
+              <div className="flex items-center gap-2 self-start md:self-auto bg-[#fbfaff] px-3.5 py-1.5 rounded-xl border border-[#e2e8f0]/40 shrink-0">
+                <div className="flex items-center gap-4 select-none">
+                  <button
+                    type="button"
+                    onClick={() => setShowBudgetBar(prev => !prev)}
+                    className={`flex items-center gap-2 hover:opacity-85 transition-all cursor-pointer ${!showBudgetBar ? "opacity-35 line-through" : ""}`}
+                    title="Klik untuk menyembunyikan/menampilkan Budget"
+                  >
+                    <div className="w-3.5 h-3.5 rounded-sm bg-gradient-to-b from-[#ea580c] to-[#c2410c] shadow-sm"></div>
+                    <span className="text-[10.5px] font-bold text-slate-700 uppercase tracking-wide">Budget</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowActualBar(prev => !prev)}
+                    className={`flex items-center gap-2 hover:opacity-85 transition-all cursor-pointer ${!showActualBar ? "opacity-35 line-through" : ""}`}
+                    title="Klik untuk menyembunyikan/menampilkan Actual"
+                  >
+                    <div className="w-3.5 h-3.5 rounded-sm bg-gradient-to-b from-[#f97316] to-[#ea580c] shadow-sm"></div>
+                    <span className="text-[10.5px] font-bold text-slate-700 uppercase tracking-wide">Actual</span>
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* Micro Stats Row for History */}
-            {overviewHistoryData && overviewHistoryData.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6 bg-[#fbfaff] p-4 rounded-2xl border border-slate-100">
-                <div className="flex flex-col">
-                  <span className="text-[9px] font-bold text-[#8E94B7] uppercase tracking-wider">
-                    Rata-rata POG Bulanan
-                  </span>
-                  <span className="text-sm font-bold text-blue-600 mt-1">
-                    {Math.round(
-                      overviewHistoryData.reduce(
-                        (acc, curr) => acc + curr.pog,
-                        0,
-                      ) / overviewHistoryData.length,
-                    ).toLocaleString()}{" "}
-                    <span className="text-[10px] font-medium text-slate-400">
-                      Kg
-                    </span>
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[9px] font-bold text-[#8E94B7] uppercase tracking-wider">
-                    Total Penyerapan POG
-                  </span>
-                  <span className="text-sm font-bold text-indigo-600 mt-1">
-                    {overviewHistoryData
-                      .reduce((acc, curr) => acc + curr.pog, 0)
-                      .toLocaleString()}{" "}
-                    <span className="text-[10px] font-medium text-slate-400">
-                      Kg
-                    </span>
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[9px] font-bold text-[#8E94B7] uppercase tracking-wider">
-                    Mutasi Maksimal Stok
-                  </span>
-                  <span className="text-sm font-bold text-teal-600 mt-1">
-                    {Math.max(
-                      ...overviewHistoryData.map((d) => d.ending),
-                    ).toLocaleString()}{" "}
-                    <span className="text-[10px] font-medium text-slate-400">
-                      Kg
-                    </span>
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[9px] font-bold text-[#8E94B7] uppercase tracking-wider">
-                    Bulan Teraktif
-                  </span>
-                  <span className="text-sm font-bold text-amber-600 mt-1 truncate">
-                    {(() => {
-                      const maxPogObj = [...overviewHistoryData].sort(
-                        (a, b) => b.pog - a.pog,
-                      )[0];
-                      return maxPogObj ? maxPogObj.monthLabel : "-";
-                    })()}
-                  </span>
-                </div>
-              </div>
-            )}
-
             <div className="h-64 w-full font-sans">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
+                <BarChart
                   data={overviewHistoryData}
-                  margin={{ top: 25, right: 15, left: -15, bottom: 5 }}
+                  margin={{ top: 38, right: 10, left: -10, bottom: 0 }}
+                  barGap={currentBarGap}
+                  barCategoryGap={currentBarCategoryGap}
+                  onMouseMove={(state) => {
+                    if (state && state.activeLabel) {
+                      setHoveredLabel(state.activeLabel);
+                      if (state.activeLabel !== dismissedTooltipLabel) {
+                        setDismissedTooltipLabel(null);
+                      }
+                    } else {
+                      setHoveredLabel(null);
+                    }
+                  }}
+                  onMouseLeave={() => {
+                    setHoveredLabel(null);
+                  }}
                 >
                   <defs>
                     <linearGradient
-                      id="historyColorOpening"
+                      id="colorTrendBudget"
                       x1="0"
                       y1="0"
                       x2="0"
                       y2="1"
                     >
                       <stop
-                        offset="5%"
-                        stopColor="#4f46e5"
-                        stopOpacity={0.25}
+                        offset="0%"
+                        stopColor="#154be2"
+                        stopOpacity={0.95}
                       />
                       <stop
-                        offset="95%"
-                        stopColor="#4f46e5"
-                        stopOpacity={0.0}
+                        offset="100%"
+                        stopColor="#3b82f6"
+                        stopOpacity={0.7}
                       />
                     </linearGradient>
                     <linearGradient
-                      id="historyColorEnding"
+                      id="colorTrendActual"
                       x1="0"
                       y1="0"
                       x2="0"
                       y2="1"
                     >
                       <stop
-                        offset="5%"
-                        stopColor="#a855f7"
-                        stopOpacity={0.25}
+                        offset="0%"
+                        stopColor="#06b6d4"
+                        stopOpacity={1.0}
                       />
                       <stop
-                        offset="95%"
-                        stopColor="#a855f7"
-                        stopOpacity={0.0}
-                      />
-                    </linearGradient>
-                    <linearGradient
-                      id="historyColorStockIn"
-                      x1="0"
-                      y1="0"
-                      x2="0"
-                      y2="1"
-                    >
-                      <stop
-                        offset="5%"
-                        stopColor="#10b981"
-                        stopOpacity={0.25}
-                      />
-                      <stop
-                        offset="95%"
-                        stopColor="#10b981"
-                        stopOpacity={0.0}
-                      />
-                    </linearGradient>
-                    <linearGradient
-                      id="historyColorIdle"
-                      x1="0"
-                      y1="0"
-                      x2="0"
-                      y2="1"
-                    >
-                      <stop
-                        offset="5%"
-                        stopColor="#f59e0b"
-                        stopOpacity={0.25}
-                      />
-                      <stop
-                        offset="95%"
-                        stopColor="#f59e0b"
-                        stopOpacity={0.0}
-                      />
-                    </linearGradient>
-                    <linearGradient
-                      id="historyColorPog"
-                      x1="0"
-                      y1="0"
-                      x2="0"
-                      y2="1"
-                    >
-                      <stop
-                        offset="5%"
-                        stopColor="#2563eb"
-                        stopOpacity={0.25}
-                      />
-                      <stop
-                        offset="95%"
-                        stopColor="#2563eb"
-                        stopOpacity={0.0}
+                        offset="100%"
+                        stopColor="#22d3ee"
+                        stopOpacity={1.0}
                       />
                     </linearGradient>
                   </defs>
-
                   <CartesianGrid
                     strokeDasharray="4 4"
                     vertical={false}
                     stroke="#e2e8f0"
                   />
                   <XAxis
-                    dataKey="monthLabel"
-                    tick={{ fill: "#4e5572", fontSize: 8.5, fontWeight: 700 }}
+                    dataKey="name"
+                    tick={<CustomXAxisTick chartData={overviewHistoryData} metricType={overviewMetricFilter} />}
                     axisLine={false}
                     tickLine={false}
+                    interval={0}
+                    height={65}
                   />
                   <YAxis
                     hide={true}
+                    domain={[0, (dataMax) => (dataMax === 0 ? 100 : Math.round(dataMax * 1.25))]}
                     tick={{ fill: "#8E94B7", fontSize: 9, fontWeight: 500 }}
                     axisLine={false}
                     tickLine={false}
                   />
-
                   <Tooltip
-                    cursor={{
-                      stroke: "#154be2",
-                      strokeWidth: 1,
-                      strokeDasharray: "4 4",
-                    }}
-                    contentStyle={{
-                      backgroundColor: "white",
-                      borderRadius: "16px",
-                      border: "1px solid #e1e7ff",
-                      boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
-                    }}
-                    labelStyle={{
-                      fontSize: "11px",
-                      fontWeight: "bold",
-                      color: "#181a2c",
-                    }}
-                    itemStyle={{ fontSize: "10px", padding: "1px 0" }}
+                    cursor={{ fill: "rgba(21, 75, 226, 0.03)" }}
+                    content={<CustomChartTooltip metricType={overviewMetricFilter} dismissedLabel={dismissedTooltipLabel} />}
                   />
-
-                  <Legend
-                    iconSize={10}
-                    iconType="circle"
-                    wrapperStyle={{
-                      fontSize: "10px",
-                      fontWeight: "bold",
-                      marginTop: "10px",
-                    }}
-                  />
-
-                  {historyChartType === "opening" && (
-                    <Area
-                      type="monotone"
-                      dataKey="opening"
-                      name="Opening Inv (Kg)"
-                      stroke="#4f46e5"
-                      strokeWidth={2.5}
-                      fillOpacity={1}
-                      fill="url(#historyColorOpening)"
-                      dot={{
-                        r: 4,
-                        strokeWidth: 2,
-                        stroke: "#4f46e5",
-                        fill: "#ffffff",
-                      }}
-                      activeDot={{ r: 6, strokeWidth: 1 }}
-                    >
-                      <LabelList
-                        dataKey="opening"
-                        position="top"
-                        offset={10}
-                        style={{
-                          fontSize: 9,
-                          fontWeight: 700,
-                          fill: "#4f46e5",
-                        }}
-                        formatter={(value: any) =>
-                          value
-                            ? Math.round(Number(value)).toLocaleString()
-                            : "0"
-                        }
-                      />
-                    </Area>
-                  )}
-
-                  {historyChartType === "ending" && (
-                    <Area
-                      type="monotone"
-                      dataKey="ending"
-                      name="Ending Inv (Kg)"
-                      stroke="#a855f7"
-                      strokeWidth={2}
-                      fillOpacity={1}
-                      fill="url(#historyColorEnding)"
-                      dot={{
-                        r: 4,
-                        strokeWidth: 2,
-                        stroke: "#a855f7",
-                        fill: "#ffffff",
-                      }}
-                      activeDot={{ r: 6, strokeWidth: 1 }}
-                    >
-                      <LabelList
-                        dataKey="ending"
-                        position="top"
-                        offset={10}
-                        style={{
-                          fontSize: 9,
-                          fontWeight: 700,
-                          fill: "#a855f7",
-                        }}
-                        formatter={(value: any) =>
-                          value
-                            ? Math.round(Number(value)).toLocaleString()
-                            : "0"
-                        }
-                      />
-                    </Area>
-                  )}
-
-                  {historyChartType === "stockIn" && (
-                    <Area
-                      type="monotone"
-                      dataKey="stockIn"
-                      name="Stock In (Kg)"
-                      stroke="#10b981"
-                      strokeWidth={1.5}
-                      fillOpacity={1}
-                      fill="url(#historyColorStockIn)"
-                      dot={{
-                        r: 4,
-                        strokeWidth: 2,
-                        stroke: "#10b981",
-                        fill: "#ffffff",
-                      }}
-                      activeDot={{ r: 6, strokeWidth: 1 }}
-                    >
-                      <LabelList
-                        dataKey="stockIn"
-                        position="top"
-                        offset={10}
-                        style={{
-                          fontSize: 9,
-                          fontWeight: 700,
-                          fill: "#10b981",
-                        }}
-                        formatter={(value: any) =>
-                          value
-                            ? Math.round(Number(value)).toLocaleString()
-                            : "0"
-                        }
-                      />
-                    </Area>
-                  )}
-
-                  {historyChartType === "idle" && (
-                    <Area
-                      type="monotone"
-                      dataKey="idle"
-                      name="Idle Stock (Kg)"
-                      stroke="#f59e0b"
-                      strokeWidth={1.5}
-                      fillOpacity={1}
-                      fill="url(#historyColorIdle)"
-                      dot={{
-                        r: 4,
-                        strokeWidth: 2,
-                        stroke: "#f59e0b",
-                        fill: "#ffffff",
-                      }}
-                      activeDot={{ r: 6, strokeWidth: 1 }}
-                    >
-                      <LabelList
-                        dataKey="idle"
-                        position="top"
-                        offset={10}
-                        style={{
-                          fontSize: 9,
-                          fontWeight: 700,
-                          fill: "#f59e0b",
-                        }}
-                        formatter={(value: any) =>
-                          value
-                            ? Math.round(Number(value)).toLocaleString()
-                            : "0"
-                        }
-                      />
-                    </Area>
-                  )}
-
-                  {historyChartType === "pog" && (
-                    <Area
-                      type="monotone"
-                      dataKey="pog"
-                      name="POG (Kg)"
-                      stroke="#2563eb"
-                      strokeWidth={2}
-                      fillOpacity={1}
-                      fill="url(#historyColorPog)"
-                      dot={{
-                        r: 4,
-                        strokeWidth: 2,
-                        stroke: "#2563eb",
-                        fill: "#ffffff",
-                      }}
-                      activeDot={{ r: 6, strokeWidth: 1 }}
-                    >
-                      <LabelList
-                        dataKey="pog"
-                        position="top"
-                        offset={10}
-                        style={{
-                          fontSize: 9,
-                          fontWeight: 700,
-                          fill: "#2563eb",
-                        }}
-                        formatter={(value: any) =>
-                          value
-                            ? Math.round(Number(value)).toLocaleString()
-                            : "0"
-                        }
-                      />
-                    </Area>
-                  )}
-                </AreaChart>
+                  <Bar
+                    hide={!showBudgetBar}
+                    dataKey={
+                      overviewMetricFilter === "activity"
+                        ? "budgetActivity"
+                        : overviewMetricFilter === "reach"
+                        ? "budgetReach"
+                        : "budgetNominal"
+                    }
+                    name="Budget"
+                    fill="url(#colorTrendBudget)"
+                    radius={[6, 6, 0, 0]}
+                    maxBarSize={currentMaxBarSize}
+                    background={<CustomBarBackground data={overviewHistoryData} activeKey={activeMainBarKey} />}
+                  >
+                    {overviewHistoryData.map((entry, index) => {
+                      const isActive = activeMainBarKey === entry.name;
+                      return (
+                        <Cell
+                          key={`cell-trend-budget-${index}`}
+                          cursor="pointer"
+                          fill={isActive ? "#ea580c" : "url(#colorTrendBudget)"}
+                          fillOpacity={1.0}
+                          onClick={() => {
+                            clickedBarRef.current = true;
+                            if (activeMainBarKey === entry.name) {
+                              setDismissedTooltipLabel(entry.name);
+                            } else {
+                              setDismissedTooltipLabel(null);
+                            }
+                            setActiveMainBarKey(prev => prev === entry.name ? null : entry.name);
+                          }}
+                        />
+                      );
+                    })}
+                    <LabelList
+                      dataKey={
+                        overviewMetricFilter === "activity"
+                          ? "budgetActivity"
+                          : overviewMetricFilter === "reach"
+                          ? "budgetReach"
+                          : "budgetNominal"
+                      }
+                      content={<CustomBudgetLabel metricType={overviewMetricFilter} />}
+                    />
+                  </Bar>
+                  <Bar
+                    hide={!showActualBar}
+                    dataKey={
+                      overviewMetricFilter === "activity"
+                        ? "actualActivity"
+                        : overviewMetricFilter === "reach"
+                        ? "actualReach"
+                        : "actualNominal"
+                    }
+                    name="Actual"
+                    fill="url(#colorTrendActual)"
+                    radius={[6, 6, 0, 0]}
+                    maxBarSize={currentMaxBarSize}
+                    background={<CustomBarBackground data={overviewHistoryData} activeKey={activeMainBarKey} />}
+                  >
+                    {overviewHistoryData.map((entry, index) => {
+                      const isActive = activeMainBarKey === entry.name;
+                      return (
+                        <Cell
+                          key={`cell-trend-actual-${index}`}
+                          cursor="pointer"
+                          fill={isActive ? "#f97316" : "url(#colorTrendActual)"}
+                          fillOpacity={1.0}
+                          onClick={() => {
+                            clickedBarRef.current = true;
+                            if (activeMainBarKey === entry.name) {
+                              setDismissedTooltipLabel(entry.name);
+                            } else {
+                              setDismissedTooltipLabel(null);
+                            }
+                            setActiveMainBarKey(prev => prev === entry.name ? null : entry.name);
+                          }}
+                        />
+                      );
+                    })}
+                    <LabelList
+                      dataKey={
+                        overviewMetricFilter === "activity"
+                          ? "actualActivity"
+                          : overviewMetricFilter === "reach"
+                          ? "actualReach"
+                          : "actualNominal"
+                      }
+                      content={<CustomActualLabel metricType={overviewMetricFilter} />}
+                    />
+                  </Bar>
+                </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
@@ -10236,24 +10355,24 @@ const Dashboard = ({
                     <h3 className="text-lg font-black text-[#181a2c] tracking-tight mt-1">
                       {focusedChartType === "sub" ? (
                         subGroupDimension === "area"
-                          ? "Sub Performa Kinerja Wilayah (Area)"
+                          ? "Sub Budget Effectiveness Wilayah (Area)"
                           : subGroupDimension === "province"
-                            ? "Sub Performa Kinerja per Provinsi"
+                            ? "Sub Budget Effectiveness per Provinsi"
                             : subGroupDimension === "sales_agronomist"
-                              ? "Sub Performa Kinerja Sales Agronomist (SA)"
+                              ? "Sub Budget Effectiveness Sales Agronomist (SA)"
                               : subGroupDimension === "hybrid" || subGroupDimension === "material"
-                                ? "Sub Performa Kinerja per Hybrid"
-                                : "Sub Performa Kinerja per Activity"
+                                ? "Sub Budget Effectiveness per Hybrid"
+                                : "Sub Budget Effectiveness per Activity"
                       ) : (
                         overviewGroupDimension === "area"
-                          ? "Performa Kinerja Wilayah (Area)"
+                          ? "Budget Effectiveness Wilayah (Area)"
                           : overviewGroupDimension === "province"
-                            ? "Performa Kinerja per Provinsi"
+                            ? "Budget Effectiveness per Provinsi"
                             : overviewGroupDimension === "sales_agronomist"
-                              ? "Performa Kinerja Sales Agronomist (SA)"
+                              ? "Budget Effectiveness Sales Agronomist (SA)"
                               : overviewGroupDimension === "hybrid" || overviewGroupDimension === "material"
-                                ? "Performa Kinerja per Hybrid"
-                                : "Performa Kinerja per Activity"
+                                ? "Budget Effectiveness per Hybrid"
+                                : "Budget Effectiveness per Activity"
                       )}
                     </h3>
                   </div>
@@ -10318,24 +10437,44 @@ const Dashboard = ({
                         >
                           Nominal
                         </button>
+                        <button
+                          onClick={() => setOverviewMetricFilter("reach")}
+                          className={`px-5 py-2 rounded-lg text-xs font-bold transition-all duration-200 ${
+                            overviewMetricFilter === "reach"
+                              ? "bg-[#154be2] text-white shadow-sm"
+                              : "text-slate-600 hover:text-slate-900"
+                          }`}
+                        >
+                          Reach
+                        </button>
                       </div>
                     </div>
                   </div>
 
                   {/* Legend */}
-                  <div className="flex items-center gap-3 ml-auto">
-                    <div className="flex items-center gap-1.5">
-                      <span className="size-3 rounded-[4px] bg-gradient-to-tr from-[#154be2] to-[#3b82f6]" />
-                      <span className="text-xs font-extrabold text-[#4e5572]">
+                  <div className="flex items-center gap-4 ml-auto select-none">
+                    <button
+                      type="button"
+                      onClick={() => setShowBudgetBar(prev => !prev)}
+                      className={`flex items-center gap-2 hover:opacity-85 transition-all cursor-pointer ${!showBudgetBar ? "opacity-35 line-through" : ""}`}
+                      title="Klik untuk menyembunyikan/menampilkan Budget"
+                    >
+                      <span className="size-4 rounded-[4px] bg-gradient-to-tr from-[#154be2] to-[#3b82f6]" />
+                      <span className="text-sm font-extrabold text-[#4e5572]">
                         Budget
                       </span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="size-3 rounded-[4px] bg-gradient-to-tr from-[#06b6d4] to-[#22d3ee]" />
-                      <span className="text-xs font-extrabold text-[#4e5572]">
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowActualBar(prev => !prev)}
+                      className={`flex items-center gap-2 hover:opacity-85 transition-all cursor-pointer ${!showActualBar ? "opacity-35 line-through" : ""}`}
+                      title="Klik untuk menyembunyikan/menampilkan Actual"
+                    >
+                      <span className="size-4 rounded-[4px] bg-gradient-to-tr from-[#06b6d4] to-[#22d3ee]" />
+                      <span className="text-sm font-extrabold text-[#4e5572]">
                         Actual
                       </span>
-                    </div>
+                    </button>
                   </div>
                 </div>
 
@@ -10357,9 +10496,28 @@ const Dashboard = ({
                     <ResponsiveContainer width="100%" height="100%">
                        <BarChart
                         data={focusedChartType === "sub" ? overviewStats.subChartData : overviewStats.areaChartData}
-                        margin={{ top: 25, right: 15, left: -10, bottom: 35 }}
+                        margin={{ top: 45, right: 15, left: -10, bottom: 35 }}
                         barGap={currentBarGap}
                         barCategoryGap={currentBarCategoryGap}
+                        onMouseMove={(state) => {
+                          if (state && state.activeLabel) {
+                            setHoveredLabel(state.activeLabel);
+                            if (focusedChartType === "sub") {
+                              if (state.activeLabel !== dismissedSubTooltipLabel) {
+                                setDismissedSubTooltipLabel(null);
+                              }
+                            } else {
+                              if (state.activeLabel !== dismissedTooltipLabel) {
+                                setDismissedTooltipLabel(null);
+                              }
+                            }
+                          } else {
+                            setHoveredLabel(null);
+                          }
+                        }}
+                        onMouseLeave={() => {
+                          setHoveredLabel(null);
+                        }}
                       >
                         <defs>
                           <linearGradient id="modalColorAreaPog" x1="0" y1="0" x2="0" y2="1">
@@ -10367,51 +10525,58 @@ const Dashboard = ({
                             <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.7} />
                           </linearGradient>
                           <linearGradient id="modalColorAreaStock" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.95} />
-                            <stop offset="100%" stopColor="#22d3ee" stopOpacity={0.7} />
+                            <stop offset="0%" stopColor="#06b6d4" stopOpacity={1.0} />
+                            <stop offset="100%" stopColor="#22d3ee" stopOpacity={1.0} />
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e2e8f0" />
-                        <XAxis dataKey="name" tick={<CustomXAxisTick />} axisLine={false} tickLine={false} interval={0} height={45} />
-                        <YAxis hide={true} tick={{ fill: "#8E94B7", fontSize: 10, fontWeight: 500 }} axisLine={false} tickLine={false} />
+                        <XAxis dataKey="name" tick={<CustomXAxisTick chartData={focusedChartType === "sub" ? overviewStats.subChartData : overviewStats.areaChartData} metricType={overviewMetricFilter} />} axisLine={false} tickLine={false} interval={0} height={65} />
+                        <YAxis hide={true} domain={[0, (dataMax: any) => (dataMax === 0 ? 100 : Math.round(dataMax * 1.25))]} tick={{ fill: "#8E94B7", fontSize: 10, fontWeight: 500 }} axisLine={false} tickLine={false} />
                         <Tooltip
                           cursor={{ fill: "rgba(21, 75, 226, 0.03)" }}
-                          contentStyle={{
-                            backgroundColor: "white",
-                            borderRadius: "16px",
-                            border: "1px solid #edecff",
-                            boxShadow: "0 12px 32px rgba(21,75,226,0.1)",
-                          }}
-                          labelStyle={{ fontSize: "12px", fontWeight: "bold", color: "#181a2c" }}
-                          itemStyle={{ fontSize: "11px", padding: "1px 0" }}
-                          formatter={(value: any, name: any) => {
-                            if (value === undefined || value === null || isNaN(Number(value))) return [value, name];
-                            return [Math.round(Number(value)).toLocaleString("id-ID"), name];
-                          }}
+                          content={<CustomChartTooltip metricType={overviewMetricFilter} dismissedLabel={focusedChartType === "sub" ? dismissedSubTooltipLabel : dismissedTooltipLabel} />}
                         />
                         <Bar
+                          hide={!showBudgetBar}
                           dataKey={
                             overviewMetricFilter === "activity"
                               ? "budgetActivity"
+                              : overviewMetricFilter === "reach"
+                              ? "budgetReach"
                               : "budgetNominal"
                           }
                           name="Budget"
                           fill="url(#modalColorAreaPog)"
                           radius={[6, 6, 0, 0]}
                           maxBarSize={currentMaxBarSize}
-                          background={<CustomBarBackground data={focusedChartType === "sub" ? overviewStats.subChartData : overviewStats.areaChartData} activeKey={focusedChartType === "sub" ? null : activeMainBarKey} />}
+                          background={<CustomBarBackground data={focusedChartType === "sub" ? overviewStats.subChartData : overviewStats.areaChartData} activeKey={focusedChartType === "sub" ? activeSubBarKey : activeMainBarKey} />}
                         >
                           {(focusedChartType === "sub" ? overviewStats.subChartData : overviewStats.areaChartData)?.map((entry: any, index: number) => {
                             const isMain = focusedChartType === "main";
+                            const isActive = (focusedChartType === "sub" ? activeSubBarKey : activeMainBarKey) === entry.name;
                             return (
                               <Cell
                                 key={`modal-cell-budget-${index}`}
-                                cursor={isMain ? "pointer" : "default"}
-                                fill="url(#modalColorAreaPog)"
+                                cursor="pointer"
+                                fill={isActive ? "#ea580c" : "url(#modalColorAreaPog)"}
                                 fillOpacity={1.0}
                                 onClick={() => {
                                   if (isMain) {
+                                    clickedBarRef.current = true;
+                                    if (activeMainBarKey === entry.name) {
+                                      setDismissedTooltipLabel(entry.name);
+                                    } else {
+                                      setDismissedTooltipLabel(null);
+                                    }
                                     setActiveMainBarKey(prev => prev === entry.name ? null : entry.name);
+                                  } else {
+                                    clickedBarRef.current = true;
+                                    if (activeSubBarKey === entry.name) {
+                                      setDismissedSubTooltipLabel(entry.name);
+                                    } else {
+                                      setDismissedSubTooltipLabel(null);
+                                    }
+                                    setActiveSubBarKey(prev => prev === entry.name ? null : entry.name);
                                   }
                                 }}
                               />
@@ -10421,47 +10586,54 @@ const Dashboard = ({
                             dataKey={
                               overviewMetricFilter === "activity"
                                 ? "budgetActivity"
+                                : overviewMetricFilter === "reach"
+                                ? "budgetReach"
                                 : "budgetNominal"
                             }
-                            position="top"
-                            offset={8}
-                            style={{ fontSize: 10, fontWeight: 700, fill: "#154be2", fontFamily: "sans-serif" }}
-                            formatter={(val: any) => {
-                              if (val === undefined || val === null || isNaN(Number(val))) return "";
-                              const num = Number(val);
-                              if (num === 0) return "0";
-                              if (overviewMetricFilter === "nominal") {
-                                if (num >= 1000000000) return (num / 1000000000).toFixed(1) + " M";
-                                if (num >= 1000000) return (num / 1000000).toFixed(0) + " Jt";
-                                return Math.round(num).toLocaleString();
-                              }
-                              return Math.round(num).toLocaleString();
-                            }}
+                            content={<CustomBudgetLabel metricType={overviewMetricFilter} />}
                           />
                         </Bar>
                         <Bar
+                          hide={!showActualBar}
                           dataKey={
                             overviewMetricFilter === "activity"
                               ? "actualActivity"
+                              : overviewMetricFilter === "reach"
+                              ? "actualReach"
                               : "actualNominal"
                           }
                           name="Actual"
                           fill="url(#modalColorAreaStock)"
                           radius={[6, 6, 0, 0]}
                           maxBarSize={currentMaxBarSize}
-                          background={<CustomBarBackground data={focusedChartType === "sub" ? overviewStats.subChartData : overviewStats.areaChartData} activeKey={focusedChartType === "sub" ? null : activeMainBarKey} />}
+                          background={<CustomBarBackground data={focusedChartType === "sub" ? overviewStats.subChartData : overviewStats.areaChartData} activeKey={focusedChartType === "sub" ? activeSubBarKey : activeMainBarKey} />}
                         >
                           {(focusedChartType === "sub" ? overviewStats.subChartData : overviewStats.areaChartData)?.map((entry: any, index: number) => {
                             const isMain = focusedChartType === "main";
+                            const isActive = (focusedChartType === "sub" ? activeSubBarKey : activeMainBarKey) === entry.name;
                             return (
                               <Cell
                                 key={`modal-cell-actual-${index}`}
-                                cursor={isMain ? "pointer" : "default"}
-                                fill="url(#modalColorAreaStock)"
+                                cursor="pointer"
+                                fill={isActive ? "#f97316" : "url(#modalColorAreaStock)"}
                                 fillOpacity={1.0}
                                 onClick={() => {
                                   if (isMain) {
+                                    clickedBarRef.current = true;
+                                    if (activeMainBarKey === entry.name) {
+                                      setDismissedTooltipLabel(entry.name);
+                                    } else {
+                                      setDismissedTooltipLabel(null);
+                                    }
                                     setActiveMainBarKey(prev => prev === entry.name ? null : entry.name);
+                                  } else {
+                                    clickedBarRef.current = true;
+                                    if (activeSubBarKey === entry.name) {
+                                      setDismissedSubTooltipLabel(entry.name);
+                                    } else {
+                                      setDismissedSubTooltipLabel(null);
+                                    }
+                                    setActiveSubBarKey(prev => prev === entry.name ? null : entry.name);
                                   }
                                 }}
                               />
@@ -10471,22 +10643,11 @@ const Dashboard = ({
                             dataKey={
                               overviewMetricFilter === "activity"
                                 ? "actualActivity"
+                                : overviewMetricFilter === "reach"
+                                ? "actualReach"
                                 : "actualNominal"
                             }
-                            position="top"
-                            offset={8}
-                            style={{ fontSize: 10, fontWeight: 700, fill: "#0a90a6", fontFamily: "sans-serif" }}
-                            formatter={(val: any) => {
-                              if (val === undefined || val === null || isNaN(Number(val))) return "";
-                              const num = Number(val);
-                              if (num === 0) return "0";
-                              if (overviewMetricFilter === "nominal") {
-                                if (num >= 1000000000) return (num / 1000000000).toFixed(1) + " M";
-                                if (num >= 1000000) return (num / 1000000).toFixed(0) + " Jt";
-                                return Math.round(num).toLocaleString();
-                              }
-                              return Math.round(num).toLocaleString();
-                            }}
+                            content={<CustomActualLabel metricType={overviewMetricFilter} />}
                           />
                         </Bar>
                       </BarChart>
@@ -13876,29 +14037,277 @@ const INDO_MONTHS = [
   "Desember",
 ];
 
+const getActivityFullName = (name: string): string => {
+  switch (name) {
+    case "FFD": return "Farmer Field Day";
+    case "FM": return "Farmer Meeting";
+    case "ODP": return "One Day Promo";
+    case "SFT": return "Special Field Trip";
+    case "BFFD": return "Big Farmer Field Day";
+    case "BFM": return "Big Farmer Meeting";
+    case "BFT": return "Big Field Trip";
+    case "BC": return "Branding Crop";
+    case "CRV": return "Caravan";
+    case "EXP": return "Expo";
+    case "PT": return "Pasar Tani";
+    default: return name;
+  }
+};
+
+const formatTooltipValue = (num: number, metricType: string) => {
+  if (num === 0) return "0";
+  const isNegative = num < 0;
+  const absNum = Math.abs(num);
+  let result = "";
+  if (metricType === "nominal") {
+    if (absNum >= 1000000000) result = (absNum / 1000000000).toFixed(1) + " Miliar";
+    else if (absNum >= 1000000) result = (absNum / 1000000).toFixed(0) + " Juta";
+    else result = Math.round(absNum).toLocaleString("id-ID");
+  } else if (metricType === "reach") {
+    result = Math.round(absNum).toLocaleString("id-ID");
+  } else {
+    result = Math.round(absNum).toLocaleString("id-ID") + " x";
+  }
+  return isNegative ? `-${result}` : result;
+};
+
+const formatChartLabelValue = (val: any, metricType: string) => {
+  if (val === undefined || val === null || isNaN(Number(val))) return "";
+  const num = Number(val);
+  if (num === 0) return "0";
+  if (metricType === "nominal") {
+    if (num >= 1000000000) return (num / 1000000000).toFixed(1) + " M";
+    if (num >= 1000000) return (num / 1000000).toFixed(0) + " Jt";
+    return Math.round(num).toLocaleString("id-ID");
+  } else if (metricType === "reach") {
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
+    if (num >= 1000) return (num / 1000).toFixed(1) + "K";
+    return Math.round(num).toLocaleString("id-ID");
+  }
+  return Math.round(num).toLocaleString("id-ID");
+};
+
+const CustomBudgetLabel = (props: any) => {
+  const { x, y, width, value, metricType } = props;
+  if (value === undefined || value === null || value === 0) return null;
+  const formattedVal = formatChartLabelValue(value, metricType || "activity");
+  const cx = x + width / 2;
+  return (
+    <g>
+      {/* Background white outline/halo for high contrast */}
+      <text
+        x={cx}
+        y={y - 22}
+        textAnchor="middle"
+        fill="none"
+        stroke="#ffffff"
+        strokeWidth={4.5}
+        strokeLinejoin="round"
+        fontSize={11}
+        fontWeight={800}
+        fontFamily="sans-serif"
+      >
+        {formattedVal}
+      </text>
+      <text
+        x={cx}
+        y={y - 22}
+        textAnchor="middle"
+        fill="#154be2"
+        fontSize={11}
+        fontWeight={800}
+        fontFamily="sans-serif"
+      >
+        {formattedVal}
+      </text>
+    </g>
+  );
+};
+
+const CustomActualLabel = (props: any) => {
+  const { x, y, width, value, metricType } = props;
+  if (value === undefined || value === null || value === 0) return null;
+  const formattedVal = formatChartLabelValue(value, metricType || "activity");
+  const cx = x + width / 2;
+  return (
+    <g>
+      {/* Background white outline/halo for high contrast */}
+      <text
+        x={cx}
+        y={y - 8}
+        textAnchor="middle"
+        fill="none"
+        stroke="#ffffff"
+        strokeWidth={4.5}
+        strokeLinejoin="round"
+        fontSize={11}
+        fontWeight={800}
+        fontFamily="sans-serif"
+      >
+        {formattedVal}
+      </text>
+      <text
+        x={cx}
+        y={y - 8}
+        textAnchor="middle"
+        fill="#0a90a6"
+        fontSize={11}
+        fontWeight={800}
+        fontFamily="sans-serif"
+      >
+        {formattedVal}
+      </text>
+    </g>
+  );
+};
+
+const CustomChartTooltip = (props: any) => {
+  const { active, payload, label, metricType, dismissedLabel } = props;
+  if (dismissedLabel === label) return null;
+  if (!active || !payload || !payload.length) return null;
+
+  const data = payload[0].payload;
+  if (!data) return null;
+
+  const budget = metricType === "nominal"
+    ? (data.budgetNominal || 0)
+    : metricType === "reach"
+    ? (data.budgetReach || 0)
+    : (data.budgetActivity || 0);
+
+  const actual = metricType === "nominal"
+    ? (data.actualNominal || 0)
+    : metricType === "reach"
+    ? (data.actualReach || 0)
+    : (data.actualActivity || 0);
+
+  const gap = actual - budget;
+  const pct = budget > 0 ? (actual / budget) * 100 : 0;
+
+  const displayName = getActivityFullName(data.name || label || "");
+
+  const formattedBudget = formatTooltipValue(budget, metricType);
+  const formattedActual = formatTooltipValue(actual, metricType);
+  const gapSign = gap > 0 ? "+" : "";
+  const formattedGap = gap === 0 ? "0" : `${gapSign}${formatTooltipValue(gap, metricType)}`;
+  const formattedPct = `${Math.round(pct)}%`;
+
+  return (
+    <div className="bg-white/95 backdrop-blur-md p-4 rounded-2xl border border-slate-100 shadow-[0_12px_32px_rgba(21,75,226,0.12)] flex flex-col gap-2 min-w-[200px]">
+      <div className="font-bold text-[13px] text-slate-800 border-b border-slate-50 pb-1.5 mb-1">
+        {displayName}
+      </div>
+      <div className="flex items-center justify-between gap-4 text-xs">
+        <span className="text-slate-400 font-medium">Budget:</span>
+        <span className="text-slate-700 font-semibold">{formattedBudget}</span>
+      </div>
+      <div className="flex items-center justify-between gap-4 text-xs">
+        <span className="text-slate-400 font-medium">Actual:</span>
+        <span className="text-slate-700 font-semibold">{formattedActual}</span>
+      </div>
+      <div className="flex items-center justify-between gap-4 text-xs border-t border-slate-50/50 pt-1.5">
+        <span className="text-slate-400 font-medium">Gap:</span>
+        <span className={`font-bold ${gap >= 0 ? "text-[#0a90a6]" : "text-[#df1b1b]"}`}>
+          {formattedGap}
+        </span>
+      </div>
+      <div className="flex items-center justify-between gap-4 text-xs">
+        <span className="text-slate-400 font-medium">Persentase:</span>
+        <span className="text-slate-700 font-bold bg-slate-50 px-1.5 py-0.5 rounded text-[10px]">
+          {formattedPct}
+        </span>
+      </div>
+    </div>
+  );
+};
+
 const CustomXAxisTick = (props: any) => {
   const { x, y, payload } = props;
   const value = payload.value || "";
   const words = typeof value === "string" ? value.split(" ") : [String(value)];
+  
+  // Find item in chartData to calculate GAP and Percentage
+  const item = props.chartData
+    ? (props.chartData.find((d: any) => d.name === value) || props.chartData[props.index])
+    : null;
+
+  const actual = item 
+    ? (props.metricType === "nominal" 
+      ? item.actualNominal 
+      : props.metricType === "reach" 
+      ? item.actualReach 
+      : item.actualActivity) 
+    : 0;
+  const budget = item 
+    ? (props.metricType === "nominal" 
+      ? item.budgetNominal 
+      : props.metricType === "reach" 
+      ? item.budgetReach 
+      : item.budgetActivity) 
+    : 0;
+
+  const gap = actual - budget;
+  const pct = budget > 0 ? (actual / budget) * 100 : 0;
+
+  const formatValue = (num: number, mType: string) => {
+    if (num === 0) return "0";
+    const absNum = Math.abs(num);
+    let result = "";
+    if (mType === "nominal") {
+      if (absNum >= 1000000000) result = (absNum / 1000000000).toFixed(1) + " M";
+      else if (absNum >= 1000000) result = (absNum / 1000000).toFixed(0) + " Jt";
+      else result = Math.round(absNum).toLocaleString("id-ID");
+    } else if (mType === "reach") {
+      if (absNum >= 1000000) result = (absNum / 1000000).toFixed(1) + "M";
+      else if (absNum >= 1000) result = (absNum / 1000).toFixed(1) + "K";
+      else result = Math.round(absNum).toLocaleString("id-ID");
+    } else {
+      result = Math.round(absNum).toLocaleString("id-ID");
+    }
+    return num < 0 ? `-${result}` : result;
+  };
+
+  const gapSign = gap > 0 ? "+" : "";
+  const formattedGap = gap === 0 ? "0" : `${gapSign}${formatValue(gap, props.metricType)}`;
+  const formattedPct = `${Math.round(pct)}%`;
+  
+  const gapText = item ? `${formattedGap} (${formattedPct})` : "";
+  
+  // Display name words (limit to 2 lines to save space)
+  const nameLines = words.slice(0, 2);
+  if (words.length > 2) {
+    nameLines[1] = nameLines[1] + "...";
+  }
+
   return (
     <g transform={`translate(${x},${y})`}>
       <text
         x={0}
         y={0}
         textAnchor="middle"
-        fill="#4e5572"
-        style={{ fontSize: "8.5px", fontWeight: 700, fontFamily: "sans-serif" }}
+        style={{ fontFamily: "sans-serif" }}
       >
-        {words.map((word: string, index: number) => {
-          if (index > 2) return null; // limit to 3 lines max
-          const displayWord =
-            index === 2 && words.length > 3 ? word + "..." : word;
-          return (
-            <tspan x={0} dy={index === 0 ? 8 : 10} key={index}>
-              {displayWord}
-            </tspan>
-          );
-        })}
+        {item && (
+          <tspan
+            x={0}
+            dy={8}
+            fill={gap >= 0 ? "#0a90a6" : "#df1b1b"}
+            style={{ fontSize: "11px", fontWeight: 900 }}
+          >
+            {gapText}
+          </tspan>
+        )}
+        {nameLines.map((word: string, index: number) => (
+          <tspan 
+            x={0} 
+            dy={index === 0 ? (item ? 13 : 8) : 10} 
+            key={`word-${index}`} 
+            fill="#4e5572" 
+            style={{ fontSize: "8.5px", fontWeight: 700 }}
+          >
+            {word}
+          </tspan>
+        ))}
       </text>
     </g>
   );
@@ -14111,15 +14520,17 @@ export default function App() {
     | "total_stock"
     | "activity"
     | "nominal"
+    | "reach"
   >("activity");
 
   // Filter states for the lower part ("yang dibawah")
-  const [filterBelowMonth, setFilterBelowMonth] = useState<string>("All");
+  const [filterBelowMonth, setFilterBelowMonth] = useState<string[]>([]);
   const [filterBelowChannel, setFilterBelowChannel] = useState<string>("All");
   const [filterBelowMaterial, setFilterBelowMaterial] = useState<string>("All");
   const [filterBelowTeam, setFilterBelowTeam] = useState<string>("All");
   const [filterBelowArea, setFilterBelowArea] = useState<string>("All");
   const [filterBelowCrop, setFilterBelowCrop] = useState<string>("All");
+  const [filterBelowType, setFilterBelowType] = useState<string>("All");
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
 
   const isAditya =
@@ -14576,6 +14987,8 @@ export default function App() {
           setFilterBelowArea={setFilterBelowArea}
           filterBelowCrop={filterBelowCrop}
           setFilterBelowCrop={setFilterBelowCrop}
+          filterBelowType={filterBelowType}
+          setFilterBelowType={setFilterBelowType}
         />
       </div>
 

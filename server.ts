@@ -653,7 +653,7 @@ async function handleGetWorkingData(user: string) {
     exp: getIdx(/^exp date$|^expired$/i),
     kiosk: getIdx(/^channel$|^kiosk$/i),
     crops: getIdx(/^crops$/i),
-    time: getIdx(/^tgl$|^waktu$|^date$|^timestamp$/i),
+    time: getIdx(/^tgl$|^waktu$|^date$|^timestamp$|^tanggal$/i),
     cond: getIdx(/^condition$|^kondisi$/i),
     dr: getIdx(/^shipping date$|^dr date$/i),
     user: getIdx(/^name checker$|^nama checker$|^user$|^pic$|^checker$/i),
@@ -1558,7 +1558,7 @@ async function handleBatchActivity(body: any) {
   }
 
   const idx = {
-    time: getIdx(/^tgl$|^waktu$|^date$|^timestamp$/i),
+    time: getIdx(/^tgl$|^waktu$|^date$|^timestamp$|^tanggal$/i),
     kiosk: getIdx(/^channel$|^kiosk$/i),
     user: getIdx(/^name checker$|^nama checker$|^user$|^pic$|^checker$/i),
     lot: getIdx(/^lot package$|^lot$/i),
@@ -1751,7 +1751,7 @@ async function handleConsolidateDatabase(body: any) {
   }
 
   const idx = {
-    time: getIdx(/^tgl$|^waktu$|^date$|^timestamp$/i),
+    time: getIdx(/^tgl$|^waktu$|^date$|^timestamp$|^tanggal$/i),
     kiosk: getIdx(/^channel$|^kiosk$/i),
     user: getIdx(/^name checker$|^nama checker$|^user$|^pic$|^checker$/i),
     lot: getIdx(/^lot package$|^lot$/i),
