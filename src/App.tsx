@@ -1717,7 +1717,12 @@ const Dashboard = ({
   const [dismissedSubTooltipLabel, setDismissedSubTooltipLabel] = useState<string | null>(null);
   const [showBudgetBar, setShowBudgetBar] = useState<boolean>(true);
   const [showActualBar, setShowActualBar] = useState<boolean>(true);
+  const [showBudgetEffectivenessFilters, setShowBudgetEffectivenessFilters] = useState<boolean>(true);
   const clickedBarRef = useRef<boolean>(false);
+
+  const [overviewSortField, setOverviewSortField] = useState<"actual" | "budget" | "percentage" | "gap">("actual");
+  const [overviewSortOrder, setOverviewSortOrder] = useState<"asc" | "desc">("desc");
+  const [overviewSubFilter, setOverviewSubFilter] = useState<"activity" | "nominal" | "reach">("activity");
 
   useEffect(() => {
     const handleGlobalClick = () => {
@@ -1810,38 +1815,330 @@ const Dashboard = ({
   const [expandedProposalId, setExpandedProposalId] = useState<string | null>(null);
   const [isPreviewPdfModalOpen, setIsPreviewPdfModalOpen] = useState<boolean>(false);
 
-  const handleDownloadPdf = () => {
+  const getSvgBase64 = (svgMarkup: string, width: number, height: number): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      const svgBlob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+      
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/png');
+          URL.revokeObjectURL(url);
+          resolve(dataUrl);
+        } else {
+          URL.revokeObjectURL(url);
+          resolve("");
+        }
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve("");
+      };
+      img.src = url;
+    });
+  };
+
+  const getUserIconBase64 = (imgUrl: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'Anonymous';
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = 120;
+          canvas.height = 120;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            // Draw a blue circular background/border ring matching Advanta Logo
+            ctx.beginPath();
+            ctx.arc(60, 60, 60, 0, Math.PI * 2);
+            ctx.fillStyle = '#154be2';
+            ctx.fill();
+
+            // Clip inner circle for image (with a border width of 5px)
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(60, 60, 55, 0, Math.PI * 2);
+            ctx.clip();
+            ctx.drawImage(img, 5, 5, 110, 110);
+            ctx.restore();
+
+            resolve(canvas.toDataURL('image/png'));
+          } else {
+            resolve("");
+          }
+        } catch (e) {
+          resolve("");
+        }
+      };
+      img.onerror = () => resolve("");
+      img.src = imgUrl;
+    });
+  };
+
+  const handleDownloadPdf = async () => {
     try {
-      const doc = new jsPDF();
-      
-      // Title Section
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(14);
-      doc.setTextColor(21, 75, 226); // Primary Color (#154be2)
-      doc.text("LAPORAN PENGAJUAN KEGIATAN (PROPOSAL SUBMIT)", 14, 20);
-      
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.setTextColor(100, 116, 139); // Gray
-      const currentDateStr = new Date().toLocaleDateString("id-ID", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit"
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4"
       });
-      doc.text(`Dicetak pada: ${currentDateStr}`, 14, 26);
-      doc.text(`Sistem: RADAR DG (Digital Generation)`, 14, 31);
+
+      const employeeName = proposalsList.length > 0 ? proposalsList[0].bs : "Addin Aji Haryanto";
       
-      // Draw a line
-      doc.setDrawColor(226, 232, 240);
-      doc.setLineWidth(0.5);
-      doc.line(14, 34, 196, 34);
+      const monthsEng = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      const dObj = new Date();
+      const documentDate = `${monthsEng[dObj.getMonth()]} ${dObj.getDate()}, 2026`;
       
-      // Table data
-      const tableColumn = ["Project No", "BS Name", "Jenis Kegiatan", "Wilayah", "Farmers", "Varietas", "Anggaran (IDR)", "Bulan"];
-      const tableRows = proposalsList.map((p) => [
+      const romanMonths = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
+      const monthRoman = romanMonths[dObj.getMonth()] || "VII";
+      let initials = "ADTO";
+      if (employeeName) {
+        const parts = employeeName.trim().split(/\s+/);
+        if (parts.length >= 2) {
+          initials = (parts[0].substring(0, 2) + parts[parts.length - 1].substring(0, 2)).toUpperCase();
+        } else if (parts.length === 1) {
+          initials = parts[0].substring(0, 4).toUpperCase();
+        }
+      }
+      const claimNo = `03/AD.SALE/${monthRoman}/2026-${initials}`;
+      const totalAdvance = proposalsList.reduce((sum, p) => sum + (p.budget ? Number(p.budget) : 0), 0);
+
+      // Draw Top Left: PT. ADVANTA SEEDS INDONESIA
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.5);
+      doc.setTextColor(30, 30, 30);
+      doc.text("PT. ADVANTA SEEDS INDONESIA", 15, 14);
+
+      // Center Banner for "BUSINESS ADVANCE"
+      doc.setFillColor(230, 230, 230);
+      doc.rect(15, 17, 180, 12, "F");
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.setTextColor(50, 50, 50);
+      doc.text("BUSINESS ADVANCE", 105, 25.5, { align: "center" });
+
+      // Information Block / Metadata Info
+      doc.setFontSize(8.5);
+      doc.setTextColor(30, 30, 30);
+
+      // Left Column
+      doc.setFont("helvetica", "normal");
+      doc.text("Employee Name", 15, 38);
+      doc.text("Employee Code", 15, 43);
+      doc.text("Department", 15, 48);
+      doc.text("Cost Center", 15, 53);
+
+      doc.setFont("helvetica", "bold");
+      doc.text(":", 42, 38);
+      doc.text(":", 42, 43);
+      doc.text(":", 42, 48);
+      doc.text(":", 42, 53);
+
+      doc.text(employeeName, 45, 38);
+      doc.text("0", 45, 43);
+      doc.text("SALES", 45, 48);
+      doc.text("A60305", 45, 53);
+
+      // Right Column
+      doc.setFont("helvetica", "normal");
+      doc.text("Date", 130, 38);
+      doc.text("Claim No", 130, 43);
+
+      doc.setFont("helvetica", "bold");
+      doc.text(":", 148, 38);
+      doc.text(":", 148, 43);
+
+      doc.text(documentDate, 151, 38);
+      doc.text(claimNo, 151, 43);
+
+      // 24-row Table starts at Y = 58
+      const tableHeaders = [["No.", "GL Code", "GL Description", "Category", "Cost Center", "Total", "Annexure"]];
+      const tableRows: any[] = [];
+      
+      // Group proposalsList by category and activity for Page 1/Summary Table
+      const groupedProposals: Array<{
+        activity: string;
+        category: string;
+        budget: number;
+        count: number;
+      }> = [];
+
+      proposalsList.forEach((p) => {
+        const existing = groupedProposals.find(
+          (g) => g.activity === p.activity && g.category === p.category
+        );
+        if (existing) {
+          existing.budget += p.budget ? Number(p.budget) : 0;
+          existing.count += 1;
+        } else {
+          groupedProposals.push({
+            activity: p.activity,
+            category: p.category,
+            budget: p.budget ? Number(p.budget) : 0,
+            count: 1,
+          });
+        }
+      });
+
+      for (let i = 0; i < 24; i++) {
+        const p = groupedProposals[i];
+        if (p) {
+          tableRows.push([
+            String(i + 1),
+            "", // GL Code is empty
+            String(p.activity).toUpperCase(),
+            p.category === "Regular" ? "Reg Activity" : "Ad Hoc",
+            "A60305",
+            p.budget ? p.budget.toLocaleString("id-ID") : "",
+            `${p.count} ACTIVITY`
+          ]);
+        } else {
+          tableRows.push([
+            String(i + 1),
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]);
+        }
+      }
+
+      (doc as any).autoTable({
+        head: tableHeaders,
+        body: tableRows,
+        startY: 57,
+        theme: "grid",
+        headStyles: {
+          fillColor: [235, 235, 235],
+          textColor: [30, 30, 30],
+          fontSize: 7.5,
+          fontStyle: "bold",
+          halign: "center",
+          valign: "middle",
+          lineWidth: 0.15,
+          lineColor: [180, 180, 180]
+        },
+        bodyStyles: {
+          fontSize: 7,
+          textColor: [30, 30, 30],
+          cellPadding: 0.75,
+          lineWidth: 0.15,
+          lineColor: [180, 180, 180],
+          valign: "middle"
+        },
+        columnStyles: {
+          0: { cellWidth: 8, halign: "center", fontStyle: "bold" },
+          1: { cellWidth: 16, halign: "center" },
+          2: { cellWidth: 62, halign: "left", fontStyle: "bold" },
+          3: { cellWidth: 22, halign: "center" },
+          4: { cellWidth: 18, halign: "center", fontStyle: "bold" },
+          5: { cellWidth: 24, halign: "right", fontStyle: "bold" },
+          6: { cellWidth: 30, halign: "left", fontStyle: "bold" }
+        },
+        margin: { left: 15, right: 15 },
+        foot: [
+          [
+            { content: "Total Advance", colSpan: 5, styles: { halign: "right", fontStyle: "bold", fontSize: 8 } },
+            { content: totalAdvance.toLocaleString("id-ID"), styles: { halign: "right", fontStyle: "bold", fontSize: 8 } },
+            { content: "", styles: { halign: "left" } }
+          ]
+        ],
+        footStyles: {
+          fillColor: [245, 245, 245],
+          textColor: [30, 30, 30],
+          lineWidth: 0.15,
+          lineColor: [180, 180, 180]
+        }
+      });
+
+      const startSignaturesY = 198;
+
+      // Claimant & Approval
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.5);
+      doc.setTextColor(30, 30, 30);
+
+      doc.text("Claimant", 45, startSignaturesY, { align: "center" });
+      doc.text("Approval", 165, startSignaturesY, { align: "center" });
+
+      doc.setDrawColor(180, 180, 180);
+      doc.setLineWidth(0.2);
+      doc.line(15, startSignaturesY + 16, 75, startSignaturesY + 16);
+      doc.line(135, startSignaturesY + 16, 195, startSignaturesY + 16);
+
+      doc.text(employeeName, 45, startSignaturesY + 20, { align: "center" });
+      doc.text("DANI ADI PRASETYA", 165, startSignaturesY + 20, { align: "center" });
+
+      // Banker's details box
+      const startBankerY = 243;
+      doc.setDrawColor(120, 120, 120);
+      doc.setLineWidth(0.25);
+      doc.rect(15, startBankerY, 180, 26);
+
+      doc.line(48, startBankerY, 48, startBankerY + 26);
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.5);
+      doc.text("Banker 's details for", 17, startBankerY + 11);
+      doc.text("remmiting fund", 17, startBankerY + 16);
+
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.15);
+      doc.line(48, startBankerY + 6.5, 195, startBankerY + 6.5);
+      doc.line(48, startBankerY + 13, 195, startBankerY + 13);
+      doc.line(48, startBankerY + 19.5, 195, startBankerY + 19.5);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.text("Beneficiary", 50, startBankerY + 4.5);
+      doc.text("Amount", 50, startBankerY + 11);
+      doc.text("Bank Name", 50, startBankerY + 17.5);
+      doc.text("Current A/C No.", 50, startBankerY + 24);
+
+      doc.setFont("helvetica", "bold");
+      doc.text(employeeName.toUpperCase(), 85, startBankerY + 4.5);
+      doc.text(`Rp${totalAdvance.toLocaleString("id-ID")}.00`, 85, startBankerY + 11);
+      doc.text("BANK CENTRAL ASIA KCP PASAR WAGE", 85, startBankerY + 17.5);
+      doc.text("Reg No. 3580482073", 85, startBankerY + 24);
+
+      // Page 2: Annexure / Lampiran Detail Kegiatan
+      doc.addPage();
+
+      // Draw Top Left: PT. ADVANTA SEEDS INDONESIA
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.5);
+      doc.setTextColor(30, 30, 30);
+      doc.text("PT. ADVANTA SEEDS INDONESIA", 15, 14);
+
+      // Center Banner for "LAMPIRAN DETAIL KEGIATAN"
+      doc.setFillColor(230, 230, 230);
+      doc.rect(15, 17, 180, 10, "F");
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.setTextColor(50, 50, 50);
+      doc.text("LAMPIRAN: DETAIL KEGIATAN PROPOSAL (ANNEXURE)", 105, 23.5, { align: "center" });
+
+      // Metadata Info
+      doc.setFontSize(8.5);
+      doc.setTextColor(50, 50, 50);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Employee Name: ${employeeName}`, 15, 33);
+      doc.text(`Claim No: ${claimNo}`, 195, 33, { align: "right" });
+
+      const appendixHeaders = [["No", "Project No", "BS Name", "Jenis Kegiatan", "Wilayah", "Farmers", "Varietas", "Anggaran (IDR)", "Bulan"]];
+      const appendixRows = proposalsList.map((p, idx) => [
+        String(idx + 1),
         p.projectNo || "-",
         p.bs || "-",
         p.activity || "-",
@@ -1851,70 +2148,45 @@ const Dashboard = ({
         p.budget ? `Rp ${Number(p.budget).toLocaleString("id-ID")}` : "Rp 0",
         p.month || "-"
       ]);
-      
-      // Generate table
+
       (doc as any).autoTable({
-        head: [tableColumn],
-        body: tableRows,
-        startY: 38,
-        theme: "striped",
+        head: appendixHeaders,
+        body: appendixRows,
+        startY: 37,
+        theme: "grid",
         headStyles: {
-          fillColor: [21, 75, 226], // Primary Color
+          fillColor: [21, 75, 226], // Premium blue for proposal details table
           textColor: [255, 255, 255],
-          fontSize: 8,
+          fontSize: 7.5,
           fontStyle: "bold",
           halign: "center",
-          valign: "middle"
+          valign: "middle",
+          lineWidth: 0.15,
+          lineColor: [180, 180, 180]
         },
         bodyStyles: {
-          fontSize: 7.5,
-          textColor: [51, 65, 85]
+          fontSize: 7,
+          textColor: [30, 30, 30],
+          cellPadding: 1.25,
+          lineWidth: 0.15,
+          lineColor: [180, 180, 180],
+          valign: "middle"
         },
         columnStyles: {
-          0: { cellWidth: 25 }, // Project No
-          1: { cellWidth: 20 }, // BS Name
-          2: { cellWidth: 25 }, // Activity
-          3: { cellWidth: 35 }, // Location
-          4: { cellWidth: 15, halign: "center" }, // Farmers
-          5: { cellWidth: 25 }, // Hybrids
-          6: { cellWidth: 23, halign: "right" }, // Budget
-          7: { cellWidth: 14, halign: "center" }  // Month
+          0: { cellWidth: 8, halign: "center" },
+          1: { cellWidth: 18, halign: "center" },
+          2: { cellWidth: 24, halign: "left" },
+          3: { cellWidth: 26, halign: "left" },
+          4: { cellWidth: 32, halign: "left" },
+          5: { cellWidth: 14, halign: "center" },
+          6: { cellWidth: 20, halign: "left" },
+          7: { cellWidth: 22, halign: "right" },
+          8: { cellWidth: 16, halign: "center" }
         },
-        margin: { top: 38, left: 14, right: 14 }
+        margin: { left: 15, right: 15 }
       });
-      
-      // Adding Signature Lines
-      const finalY = (doc as any).lastAutoTable.finalY || 100;
-      if (finalY + 45 > 280) {
-        doc.addPage();
-        // Reset finalY on new page
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(8.5);
-        doc.setTextColor(51, 65, 85);
-        
-        doc.text("Diajukan Oleh,", 25, 30);
-        doc.text("Business Specialist", 25, 35);
-        doc.line(25, 60, 75, 60);
-        
-        doc.text("Disetujui Oleh,", 135, 30);
-        doc.text("Management / Lead", 135, 35);
-        doc.line(135, 60, 185, 60);
-      } else {
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(8.5);
-        doc.setTextColor(51, 65, 85);
-        
-        doc.text("Diajukan Oleh,", 25, finalY + 15);
-        doc.text("Business Specialist", 25, finalY + 20);
-        doc.line(25, finalY + 45, 75, finalY + 45);
-        
-        doc.text("Disetujui Oleh,", 135, finalY + 15);
-        doc.text("Management / Lead", 135, finalY + 20);
-        doc.line(135, finalY + 45, 185, finalY + 45);
-      }
-      
-      // Save the PDF
-      const fileName = `Laporan_Pengajuan_Proyek_Radar_DG_${new Date().toISOString().slice(0, 10)}.pdf`;
+
+      const fileName = `Business_Advance_${employeeName.replace(/\s+/g, "_")}_${new Date().toISOString().slice(0, 10)}.pdf`;
       doc.save(fileName);
       setIsPreviewPdfModalOpen(false);
     } catch (error) {
@@ -5294,6 +5566,77 @@ const Dashboard = ({
     });
   }, [pogDataOverviewFiltered, overviewMetricFilter, filterBelowType]);
 
+  const chartMetric = overviewMetricFilter === "overview" ? overviewSubFilter : overviewMetricFilter;
+
+  const overviewTotals = useMemo(() => {
+    const REGULAR_LIST = ["FFD", "FM", "ODP", "SFT", "BC", "PT"];
+    const ADHOC_LIST = ["BFFD", "BFM", "BFT", "CRV", "EXP"];
+    let ACTIVITIES_LIST = ["FFD", "FM", "ODP", "SFT", "BFFD", "BFM", "BFT", "BC", "CRV", "EXP", "PT"];
+    if (filterBelowType === "Regular") {
+      ACTIVITIES_LIST = REGULAR_LIST;
+    } else if (filterBelowType === "AdHoc") {
+      ACTIVITIES_LIST = ADHOC_LIST;
+    }
+
+    const ORIGINAL_ACTIVITIES_LIST = ["FFD", "FM", "ODP", "SFT", "BFFD", "BFM", "BFT", "BC", "CRV", "EXP", "PT"];
+
+    const totals = {
+      FFD: { budgetActivity: 120, actualActivity: 95, budgetNominal: 150000000, actualNominal: 125000000, budgetReach: 3000, actualReach: 2400 },
+      FM: { budgetActivity: 250, actualActivity: 210, budgetNominal: 320000000, actualNominal: 280000000, budgetReach: 6250, actualReach: 5250 },
+      ODP: { budgetActivity: 80, actualActivity: 72, budgetNominal: 90000000, actualNominal: 81000000, budgetReach: 2000, actualReach: 1800 },
+      SFT: { budgetActivity: 150, actualActivity: 130, budgetNominal: 180000000, actualNominal: 162000000, budgetReach: 3750, actualReach: 3250 },
+      BFFD: { budgetActivity: 60, actualActivity: 45, budgetNominal: 90000000, actualNominal: 70000000, budgetReach: 1500, actualReach: 1125 },
+      BFM: { budgetActivity: 110, actualActivity: 90, budgetNominal: 160000000, actualNominal: 130000000, budgetReach: 2750, actualReach: 2250 },
+      BFT: { budgetActivity: 45, actualActivity: 38, budgetNominal: 75000000, actualNominal: 65000000, budgetReach: 1125, actualReach: 950 },
+      BC: { budgetActivity: 200, actualActivity: 175, budgetNominal: 120000000, actualNominal: 105000000, budgetReach: 5000, actualReach: 4375 },
+      CRV: { budgetActivity: 70, actualActivity: 58, budgetNominal: 110000000, actualNominal: 95000000, budgetReach: 1750, actualReach: 1450 },
+      EXP: { budgetActivity: 30, actualActivity: 24, budgetNominal: 140000000, actualNominal: 115000000, budgetReach: 750, actualReach: 600 },
+      PT: { budgetActivity: 95, actualActivity: 82, budgetNominal: 55000000, actualNominal: 48000000, budgetReach: 2375, actualReach: 2050 },
+    };
+
+    pogDataOverviewFiltered.forEach((item) => {
+      const kioskCharSum = (item.kiosk || "").split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+      const seedVal = kioskCharSum % 100;
+      const actIdx = kioskCharSum % ORIGINAL_ACTIVITIES_LIST.length;
+      const actName = ORIGINAL_ACTIVITIES_LIST[actIdx];
+
+      const rowBudAct = 1 + (seedVal % 4);
+      const rowActAct = Math.round(rowBudAct * (0.8 + (seedVal % 20) / 100));
+
+      const rowBudNom = (2000000 + (seedVal * 150000) % 15000000);
+      const rowActNom = Math.round(rowBudNom * (0.82 + (seedVal % 18) / 100));
+
+      const rowBudReach = rowBudAct * (20 + (seedVal % 15));
+      const rowActReach = Math.round(rowBudReach * (0.8 + (seedVal % 20) / 100));
+
+      if ((totals as any)[actName]) {
+        (totals as any)[actName].budgetActivity += rowBudAct;
+        (totals as any)[actName].actualActivity += rowActAct;
+        (totals as any)[actName].budgetNominal += rowBudNom;
+        (totals as any)[actName].actualNominal += rowActNom;
+        (totals as any)[actName].budgetReach += rowBudReach;
+        (totals as any)[actName].actualReach += rowActReach;
+      }
+    });
+
+    const activeTotals = Object.keys(totals)
+      .filter((k) => ACTIVITIES_LIST.includes(k))
+      .map((k) => (totals as any)[k]);
+
+    const totalBudgetAct = activeTotals.reduce((sum, t) => sum + t.budgetActivity, 0);
+    const totalActualAct = activeTotals.reduce((sum, t) => sum + t.actualActivity, 0);
+    const totalBudgetNom = activeTotals.reduce((sum, t) => sum + t.budgetNominal, 0);
+    const totalActualNom = activeTotals.reduce((sum, t) => sum + t.actualNominal, 0);
+    const totalBudgetReach = activeTotals.reduce((sum, t) => sum + t.budgetReach, 0);
+    const totalActualReach = activeTotals.reduce((sum, t) => sum + t.actualReach, 0);
+
+    return {
+      activity: { budget: totalBudgetAct, actual: totalActualAct },
+      nominal: { budget: totalBudgetNom, actual: totalActualNom },
+      reach: { budget: totalBudgetReach, actual: totalActualReach },
+    };
+  }, [pogDataOverviewFiltered, filterBelowType]);
+
   const overviewStats = useMemo(() => {
     let activeKiosks = kiosks || [];
     if (filterBelowChannel && filterBelowChannel !== "All") {
@@ -5625,23 +5968,54 @@ const Dashboard = ({
         }
       });
 
-      return Object.values(gMap).sort((a, b) => {
-        if (overviewMetricFilter === "activity") {
-          return b.budgetActivity - a.budgetActivity;
-        } else if (overviewMetricFilter === "nominal") {
-          return b.budgetNominal - a.budgetNominal;
-        } else if (overviewMetricFilter === "reach") {
-          return b.budgetReach - a.budgetReach;
-        } else if (overviewMetricFilter === "movement") {
-          return b.sellIn + b.pog - (a.sellIn + a.pog);
+      const activeMetric = overviewMetricFilter === "overview" ? overviewSubFilter : overviewMetricFilter;
+
+      const getMetricsForSort = (item: any) => {
+        let actual = 0;
+        let budget = 0;
+        if (activeMetric === "activity") {
+          actual = item.actualActivity || 0;
+          budget = item.budgetActivity || 0;
+        } else if (activeMetric === "nominal") {
+          actual = item.actualNominal || 0;
+          budget = item.budgetNominal || 0;
+        } else if (activeMetric === "reach") {
+          actual = item.actualReach || 0;
+          budget = item.budgetReach || 0;
+        } else if (activeMetric === "movement") {
+          actual = (item.sellIn || 0) + (item.pog || 0);
+          budget = item.sellOut || 0;
         } else if (overviewMetricFilter === "idle") {
-          return b.idle - a.idle;
+          actual = item.idle || 0;
+          budget = 0;
         } else if (overviewMetricFilter === "total_stock") {
-          return b.stock - a.stock;
+          actual = item.stock || 0;
+          budget = 0;
         } else if (overviewMetricFilter === "Opening") {
-          return b.opening - a.opening;
+          actual = item.opening || 0;
+          budget = 0;
         } else {
-          return b.pog - a.pog;
+          actual = item.pog || 0;
+          budget = 0;
+        }
+
+        const percentage = budget > 0 ? (actual / budget) * 100 : 0;
+        const gap = actual - budget;
+
+        return { actual, budget, percentage, gap };
+      };
+
+      return Object.values(gMap).sort((a, b) => {
+        const metricsA = getMetricsForSort(a);
+        const metricsB = getMetricsForSort(b);
+
+        let valA = metricsA[overviewSortField];
+        let valB = metricsB[overviewSortField];
+
+        if (overviewSortOrder === "asc") {
+          return valA - valB;
+        } else {
+          return valB - valA;
         }
       });
     };
@@ -5766,8 +6140,30 @@ const Dashboard = ({
       }
     }
 
-    // Sort descending by actual
-    partnerChartData.sort((a, b) => b.actual - a.actual);
+    // Sort partnerChartData by sort filters
+    partnerChartData.sort((a, b) => {
+      const actA = a.actual || 0;
+      const budA = a.budget || 0;
+      const pctA = budA > 0 ? (actA / budA) * 100 : 0;
+      const gapA = actA - budA;
+
+      const actB = b.actual || 0;
+      const budB = b.budget || 0;
+      const pctB = budB > 0 ? (actB / budB) * 100 : 0;
+      const gapB = actB - budB;
+
+      const metricsA = { actual: actA, budget: budA, percentage: pctA, gap: gapA };
+      const metricsB = { actual: actB, budget: budB, percentage: pctB, gap: gapB };
+
+      let valA = metricsA[overviewSortField];
+      let valB = metricsB[overviewSortField];
+
+      if (overviewSortOrder === "asc") {
+        return valA - valB;
+      } else {
+        return valB - valA;
+      }
+    });
 
     // Group by Crops
     const cropMap: Record<
@@ -5803,6 +6199,7 @@ const Dashboard = ({
     kiosks,
     pogDataOverviewFiltered,
     overviewMetricFilter,
+    overviewSubFilter,
     overviewGroupDimension,
     subGroupDimension,
     partnerSegmentDimension,
@@ -5817,6 +6214,8 @@ const Dashboard = ({
     teamAreas,
     activeMainBarKey,
     activeActivityFilter,
+    overviewSortField,
+    overviewSortOrder,
   ]);
 
   const topKiosksData = useMemo(() => {
@@ -9092,39 +9491,27 @@ const Dashboard = ({
               </div>
             </div>
 
-            {/* Metrik Selector Buttons (Sejajar dengan Title, Rata Kanan) */}
+            {/* Metrik Selector Dropdown Picklist */}
             <div className="flex items-center gap-2">
-              <div className="flex bg-slate-100 p-1 rounded-2xl border border-[#e2e8f0]">
-                <button
-                  onClick={() => setOverviewMetricFilter("activity")}
-                  className={`px-6 py-3 rounded-xl text-sm font-black transition-all duration-200 ${
-                    overviewMetricFilter === "activity"
-                      ? "bg-[#154be2] text-white shadow-[0_4px_12px_rgba(21,75,226,0.25)]"
-                      : "text-[#5c648e] hover:text-[#181a2c] hover:bg-slate-200"
-                  }`}
-                >
-                  Activity
-                </button>
-                <button
-                  onClick={() => setOverviewMetricFilter("nominal")}
-                  className={`px-6 py-3 rounded-xl text-sm font-black transition-all duration-200 ${
-                    overviewMetricFilter === "nominal"
-                      ? "bg-[#154be2] text-white shadow-[0_4px_12px_rgba(21,75,226,0.25)]"
-                      : "text-[#5c648e] hover:text-[#181a2c] hover:bg-slate-200"
-                  }`}
-                >
-                  Nominal
-                </button>
-                <button
-                  onClick={() => setOverviewMetricFilter("reach")}
-                  className={`px-6 py-3 rounded-xl text-sm font-black transition-all duration-200 ${
-                    overviewMetricFilter === "reach"
-                      ? "bg-[#154be2] text-white shadow-[0_4px_12px_rgba(21,75,226,0.25)]"
-                      : "text-[#5c648e] hover:text-[#181a2c] hover:bg-slate-200"
-                  }`}
-                >
-                  Reach
-                </button>
+              <div className="relative bg-gradient-to-r from-[#154be2] to-[#0f3db5] px-5 py-2.5 rounded-2xl border border-[#154be2]/20 shadow-[0_8px_20px_rgba(21,75,226,0.3)] hover:shadow-[0_12px_28px_rgba(21,75,226,0.4)] transition-all duration-300 flex items-center gap-3 select-none hover:scale-[1.02]">
+                <span className="text-[10px] font-black text-blue-200 uppercase tracking-wider">
+                  Metric:
+                </span>
+                <div className="relative flex items-center">
+                  <select
+                    value={overviewMetricFilter}
+                    onChange={(e: any) => setOverviewMetricFilter(e.target.value as any)}
+                    className="bg-transparent text-sm font-black text-white focus:outline-none focus:ring-0 appearance-none cursor-pointer pr-7 pl-1 py-0.5 leading-tight"
+                  >
+                    <option value="overview" className="text-slate-900 bg-white font-semibold">Overview</option>
+                    <option value="activity" className="text-slate-900 bg-white font-semibold">Activity</option>
+                    <option value="nominal" className="text-slate-900 bg-white font-semibold">Nominal</option>
+                    <option value="reach" className="text-slate-900 bg-white font-semibold">Reach</option>
+                  </select>
+                  <span className="material-symbols-outlined absolute right-0 top-1/2 -translate-y-1/2 text-[18px] text-white pointer-events-none font-bold">
+                    expand_more
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -9148,7 +9535,7 @@ const Dashboard = ({
             />
             
             {/* Filter Content */}
-            <div className={`relative w-full max-w-4xl bg-white p-6 md:p-8 rounded-[32px] shadow-[0_24px_64px_rgba(0,0,0,0.25)] transition-all duration-300 transform ${isOverviewFilterOpen ? "scale-100 translate-y-0" : "scale-95 translate-y-4"}`}>
+            <div className={`relative w-full max-w-5xl bg-white p-6 md:p-8 rounded-[32px] shadow-[0_24px_64px_rgba(0,0,0,0.25)] transition-all duration-300 transform ${isOverviewFilterOpen ? "scale-100 translate-y-0" : "scale-95 translate-y-4"}`}>
               <div className="flex items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-primary text-[20px] lg:text-[24px] font-semibold">
@@ -9166,7 +9553,7 @@ const Dashboard = ({
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4 lg:gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4 lg:gap-5">
                 {/* Filter 2 - Month (Multi-Select Dropdown) */}
                 <div className="flex flex-col gap-2" ref={monthDropdownRef}>
                   <label className="text-[10px] lg:text-[11px] font-bold text-[#8E94B7] uppercase tracking-wider">
@@ -9399,6 +9786,40 @@ const Dashboard = ({
                     </span>
                   </div>
                 </div>
+
+                {/* Filter 3 - Sort */}
+                <div className="flex flex-col gap-2">
+                  <label className="text-[10px] lg:text-[11px] font-bold text-[#8E94B7] uppercase tracking-wider">
+                    Sort By
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <select
+                        value={overviewSortField}
+                        onChange={(e) => setOverviewSortField(e.target.value as any)}
+                        className="w-full bg-[#fbfaff] border border-[#e2e8f0] rounded-xl px-2.5 lg:px-4 py-3 text-[11px] lg:text-xs font-bold text-[#181a2c] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none cursor-pointer pr-10"
+                      >
+                        <option value="actual">Actual</option>
+                        <option value="budget">Budget</option>
+                        <option value="percentage">Percentage</option>
+                        <option value="gap">Gap</option>
+                      </select>
+                      <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[18px] text-[#8E94B7] pointer-events-none">
+                        expand_more
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setOverviewSortOrder(overviewSortOrder === "desc" ? "asc" : "desc")}
+                      className="p-3 bg-[#fbfaff] hover:bg-[#154be2]/10 active:bg-[#154be2]/20 border border-[#e2e8f0] rounded-xl flex items-center justify-center transition-all cursor-pointer text-[#154be2] shrink-0"
+                      title={overviewSortOrder === "desc" ? "Tertinggi (Klik untuk Terendah)" : "Terendah (Klik untuk Tertinggi)"}
+                    >
+                      <span className="material-symbols-outlined text-[20px] font-semibold">
+                        {overviewSortOrder === "desc" ? "arrow_downward" : "arrow_upward"}
+                      </span>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -9410,7 +9831,7 @@ const Dashboard = ({
           {/* Charts Grid Row 1 */}
           <div className="grid grid-cols-1 lg:grid-cols-11 gap-6 mb-6">
             {/* Chart 1: Sales (POG) & Stock per Area / Dimension */}
-            <div className="lg:col-span-7 bg-white p-4 lg:p-5 rounded-[48px] shadow-[0_12px_32px_rgba(21,75,226,0.18)] border border-[#154be2]/8 flex flex-col gap-0 h-fit">
+            <div className="lg:col-span-7 bg-white p-4 lg:p-5 rounded-[48px] shadow-[0_12px_32px_rgba(21,75,226,0.18)] border border-[#154be2]/8 flex flex-col gap-0 lg:h-[660px] h-fit">
               <div className="flex flex-col gap-1 mb-1 pb-1 border-b border-[#f0effc]/60">
                 <div className="flex items-start justify-between">
                   <div>
@@ -9448,83 +9869,140 @@ const Dashboard = ({
 
                 <div className="flex flex-wrap items-center justify-between gap-3 w-full">
                   {/* Selector Filter 2: Dimensi Grouping */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex items-center gap-2 bg-[#fbfaff] px-2.5 py-1 rounded-xl border border-[#e2e8f0]/80">
-                      <span className="text-[9.5px] font-bold text-[#8E94B7] uppercase tracking-wider">
-                        Dimensi:
-                      </span>
-                      <div className="relative">
-                        <select
-                          value={overviewGroupDimension}
-                          onChange={(e: any) =>
-                            setOverviewGroupDimension(e.target.value as any)
-                          }
-                          className="bg-transparent text-[10.5px] font-black text-[#154be2] focus:outline-none focus:ring-0 appearance-none cursor-pointer pr-6 py-0.5"
-                        >
-                          <option value="area">Area</option>
-                          <option value="province">Province</option>
-                          <option value="sales_agronomist">Sales Agronomist</option>
-                          <option value="hybrid">Hybrids</option>
-                          <option value="activity">Activity</option>
-                        </select>
-                        <span className="material-symbols-outlined absolute right-0 top-1/2 -translate-y-1/2 text-[14px] text-primary pointer-events-none">
-                          expand_more
+                  {showBudgetEffectivenessFilters && (
+                    <div className="flex flex-wrap items-center gap-2 animate-fadeIn">
+                      <div className="flex items-center gap-2 bg-[#fbfaff] px-2.5 py-1 rounded-xl border border-[#e2e8f0]/80">
+                        <span className="text-[9.5px] font-bold text-[#8E94B7] uppercase tracking-wider">
+                          Dimensi:
                         </span>
+                        <div className="relative">
+                          <select
+                            value={overviewGroupDimension}
+                            onChange={(e: any) =>
+                              setOverviewGroupDimension(e.target.value as any)
+                            }
+                            className="bg-transparent text-[10.5px] font-black text-[#154be2] focus:outline-none focus:ring-0 appearance-none cursor-pointer pr-6 py-0.5"
+                          >
+                            <option value="area">Area</option>
+                            <option value="province">Province</option>
+                            <option value="sales_agronomist">Sales Agronomist</option>
+                            <option value="hybrid">Hybrids</option>
+                            <option value="activity">Activity</option>
+                          </select>
+                          <span className="material-symbols-outlined absolute right-0 top-1/2 -translate-y-1/2 text-[14px] text-primary pointer-events-none">
+                            expand_more
+                          </span>
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Selector Filter: Sub Grouping */}
-                    <div className="flex items-center gap-2 bg-[#fbfaff] px-2.5 py-1 rounded-xl border border-[#e2e8f0]/80">
-                      <span className="text-[9.5px] font-bold text-[#8E94B7] uppercase tracking-wider">
-                        Sub:
-                      </span>
-                      <div className="relative">
-                        <select
-                          value={subGroupDimension}
-                          onChange={(e: any) =>
-                            setSubGroupDimension(e.target.value as any)
-                          }
-                          className="bg-transparent text-[10.5px] font-black text-[#154be2] focus:outline-none focus:ring-0 appearance-none cursor-pointer pr-6 py-0.5"
-                        >
-                          <option value="area">Area</option>
-                          <option value="province">Province</option>
-                          <option value="sales_agronomist">Sales Agronomist</option>
-                          <option value="hybrid">Hybrids</option>
-                          <option value="activity">Activity</option>
-                        </select>
-                        <span className="material-symbols-outlined absolute right-0 top-1/2 -translate-y-1/2 text-[14px] text-primary pointer-events-none">
-                          expand_more
+                      {/* Selector Filter: Sub Grouping */}
+                      <div className="flex items-center gap-2 bg-[#fbfaff] px-2.5 py-1 rounded-xl border border-[#e2e8f0]/80">
+                        <span className="text-[9.5px] font-bold text-[#8E94B7] uppercase tracking-wider">
+                          Sub:
                         </span>
+                        <div className="relative">
+                          <select
+                            value={subGroupDimension}
+                            onChange={(e: any) =>
+                              setSubGroupDimension(e.target.value as any)
+                            }
+                            className="bg-transparent text-[10.5px] font-black text-[#154be2] focus:outline-none focus:ring-0 appearance-none cursor-pointer pr-6 py-0.5"
+                          >
+                            <option value="area">Area</option>
+                            <option value="province">Province</option>
+                            <option value="sales_agronomist">Sales Agronomist</option>
+                            <option value="hybrid">Hybrids</option>
+                            <option value="activity">Activity</option>
+                          </select>
+                          <span className="material-symbols-outlined absolute right-0 top-1/2 -translate-y-1/2 text-[14px] text-primary pointer-events-none">
+                            expand_more
+                          </span>
+                        </div>
                       </div>
+
+                      {/* Selector Filter: Sorting */}
+                      <div className="flex items-center gap-2 bg-[#fbfaff] px-2.5 py-1 rounded-xl border border-[#e2e8f0]/80">
+                        <span className="text-[9.5px] font-bold text-[#8E94B7] uppercase tracking-wider">
+                          Sort:
+                        </span>
+                        <div className="relative">
+                          <select
+                            value={overviewSortField}
+                            onChange={(e: any) =>
+                              setOverviewSortField(e.target.value as any)
+                            }
+                            className="bg-transparent text-[10.5px] font-black text-[#154be2] focus:outline-none focus:ring-0 appearance-none cursor-pointer pr-6 py-0.5"
+                          >
+                            <option value="actual">Actual</option>
+                            <option value="budget">Budget</option>
+                            <option value="percentage">Percentage</option>
+                            <option value="gap">Gap</option>
+                          </select>
+                          <span className="material-symbols-outlined absolute right-0 top-1/2 -translate-y-1/2 text-[14px] text-primary pointer-events-none">
+                            expand_more
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Sort Order Icon Toggle Button */}
+                      <button
+                        type="button"
+                        onClick={() => setOverviewSortOrder(prev => prev === "desc" ? "asc" : "desc")}
+                        className="p-1 bg-[#fbfaff] hover:bg-[#154be2]/10 active:bg-[#154be2]/20 border border-[#e2e8f0]/80 rounded-xl flex items-center justify-center transition-all cursor-pointer text-[#154be2] shrink-0"
+                        title={overviewSortOrder === "desc" ? "Urutkan Terendah (asc)" : "Urutkan Tertinggi (desc)"}
+                      >
+                        <span className="material-symbols-outlined text-[16px] font-bold">
+                          {overviewSortOrder === "desc" ? "arrow_downward" : "arrow_upward"}
+                        </span>
+                      </button>
                     </div>
-                  </div>
+                  )}
 
-
-
-                  {/* Legend aligned side-by-side */}
-                  <div className="flex items-center gap-4 bg-[#fbfaff] px-3.5 py-1.5 rounded-xl border border-[#e2e8f0]/40 shrink-0 ml-auto select-none">
+                  <div className="flex items-center gap-3 shrink-0 ml-auto select-none">
+                    {/* Toggle Filters Button */}
                     <button
                       type="button"
-                      onClick={() => setShowBudgetBar(prev => !prev)}
-                      className={`flex items-center gap-2 hover:opacity-85 transition-all cursor-pointer ${!showBudgetBar ? "opacity-35 line-through" : ""}`}
-                      title="Klik untuk menyembunyikan/menampilkan Budget"
+                      onClick={() => setShowBudgetEffectivenessFilters(prev => !prev)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-black transition-all cursor-pointer ${
+                        showBudgetEffectivenessFilters
+                          ? "bg-[#154be2]/10 text-[#154be2] border-[#154be2]/20 hover:bg-[#154be2]/15"
+                          : "bg-slate-50 text-[#5c648e] border-[#e2e8f0]/80 hover:bg-slate-100"
+                      }`}
+                      title={showBudgetEffectivenessFilters ? "Sembunyikan Filter" : "Tampilkan Filter"}
                     >
-                      <span className="size-3.5 rounded-[4px] bg-gradient-to-tr from-[#154be2] to-[#3b82f6]" />
-                      <span className="text-[12px] font-extrabold text-[#4e5572]">
-                        Budget
+                      <span className="material-symbols-outlined text-[16px]">
+                        {showBudgetEffectivenessFilters ? "visibility_off" : "tune"}
+                      </span>
+                      <span>
+                        {showBudgetEffectivenessFilters ? "Hide Filters" : "Show Filters"}
                       </span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowActualBar(prev => !prev)}
-                      className={`flex items-center gap-2 hover:opacity-85 transition-all cursor-pointer ${!showActualBar ? "opacity-35 line-through" : ""}`}
-                      title="Klik untuk menyembunyikan/menampilkan Actual"
-                    >
-                      <span className="size-3.5 rounded-[4px] bg-gradient-to-tr from-[#06b6d4] to-[#22d3ee]" />
-                      <span className="text-[12px] font-extrabold text-[#4e5572]">
-                        Actual
-                      </span>
-                    </button>
+
+                    {/* Legend aligned side-by-side */}
+                    <div className="flex items-center gap-4 bg-[#fbfaff] px-3.5 py-1.5 rounded-xl border border-[#e2e8f0]/40">
+                      <button
+                        type="button"
+                        onClick={() => setShowBudgetBar(prev => !prev)}
+                        className={`flex items-center gap-2 hover:opacity-85 transition-all cursor-pointer ${!showBudgetBar ? "opacity-35 line-through" : ""}`}
+                        title="Klik untuk menyembunyikan/menampilkan Budget"
+                      >
+                        <span className="size-3.5 rounded-[4px] bg-gradient-to-tr from-[#154be2] to-[#3b82f6]" />
+                        <span className="text-[12px] font-extrabold text-[#4e5572]">
+                          Budget
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowActualBar(prev => !prev)}
+                        className={`flex items-center gap-2 hover:opacity-85 transition-all cursor-pointer ${!showActualBar ? "opacity-35 line-through" : ""}`}
+                        title="Klik untuk menyembunyikan/menampilkan Actual"
+                      >
+                        <span className="size-3.5 rounded-[4px] bg-gradient-to-tr from-[#06b6d4] to-[#22d3ee]" />
+                        <span className="text-[12px] font-extrabold text-[#4e5572]">
+                          Actual
+                        </span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -9603,7 +10081,7 @@ const Dashboard = ({
                       />
                       <XAxis
                         dataKey="name"
-                        tick={<CustomXAxisTick chartData={overviewStats.areaChartData} metricType={overviewMetricFilter} />}
+                        tick={<CustomXAxisTick chartData={overviewStats.areaChartData} metricType={chartMetric} />}
                         axisLine={false}
                         tickLine={false}
                         interval={0}
@@ -9618,14 +10096,24 @@ const Dashboard = ({
                       />
                       <Tooltip
                         cursor={{ fill: "rgba(21, 75, 226, 0.03)" }}
-                        content={<CustomChartTooltip metricType={overviewMetricFilter} dismissedLabel={dismissedTooltipLabel} />}
+                        wrapperStyle={{ pointerEvents: "auto" }}
+                        content={
+                          <CustomChartTooltip
+                            metricType={chartMetric}
+                            dismissedLabel={dismissedTooltipLabel}
+                            onClose={(lbl: string) => {
+                              setDismissedTooltipLabel(lbl);
+                              setActiveMainBarKey(null);
+                            }}
+                          />
+                        }
                       />
                       <Bar
                         hide={!showBudgetBar}
                         dataKey={
-                          overviewMetricFilter === "activity"
+                          chartMetric === "activity"
                             ? "budgetActivity"
-                            : overviewMetricFilter === "reach"
+                            : chartMetric === "reach"
                             ? "budgetReach"
                             : "budgetNominal"
                         }
@@ -9657,21 +10145,21 @@ const Dashboard = ({
                         })}
                         <LabelList
                           dataKey={
-                            overviewMetricFilter === "activity"
+                            chartMetric === "activity"
                               ? "budgetActivity"
-                              : overviewMetricFilter === "reach"
+                              : chartMetric === "reach"
                               ? "budgetReach"
                               : "budgetNominal"
                           }
-                          content={<CustomBudgetLabel metricType={overviewMetricFilter} />}
+                          content={<CustomBudgetLabel metricType={chartMetric} />}
                         />
                       </Bar>
                       <Bar
                         hide={!showActualBar}
                         dataKey={
-                          overviewMetricFilter === "activity"
+                          chartMetric === "activity"
                             ? "actualActivity"
-                            : overviewMetricFilter === "reach"
+                            : chartMetric === "reach"
                             ? "actualReach"
                             : "actualNominal"
                         }
@@ -9703,13 +10191,13 @@ const Dashboard = ({
                         })}
                         <LabelList
                           dataKey={
-                            overviewMetricFilter === "activity"
+                            chartMetric === "activity"
                               ? "actualActivity"
-                              : overviewMetricFilter === "reach"
+                              : chartMetric === "reach"
                               ? "actualReach"
                               : "actualNominal"
                           }
-                          content={<CustomActualLabel metricType={overviewMetricFilter} />}
+                          content={<CustomActualLabel metricType={chartMetric} />}
                         />
                       </Bar>
                     </BarChart>
@@ -9845,7 +10333,7 @@ const Dashboard = ({
                       />
                       <XAxis
                         dataKey="name"
-                        tick={<CustomXAxisTick chartData={overviewStats.subChartData} metricType={overviewMetricFilter} />}
+                        tick={<CustomXAxisTick chartData={overviewStats.subChartData} metricType={chartMetric} />}
                         axisLine={false}
                         tickLine={false}
                         interval={0}
@@ -9860,14 +10348,24 @@ const Dashboard = ({
                       />
                       <Tooltip
                         cursor={{ fill: "rgba(21, 75, 226, 0.03)" }}
-                        content={<CustomChartTooltip metricType={overviewMetricFilter} dismissedLabel={dismissedSubTooltipLabel} />}
+                        wrapperStyle={{ pointerEvents: "auto" }}
+                        content={
+                          <CustomChartTooltip
+                            metricType={chartMetric}
+                            dismissedLabel={dismissedSubTooltipLabel}
+                            onClose={(lbl: string) => {
+                              setDismissedSubTooltipLabel(lbl);
+                              setActiveSubBarKey(null);
+                            }}
+                          />
+                        }
                       />
                       <Bar
                         hide={!showBudgetBar}
                         dataKey={
-                          overviewMetricFilter === "activity"
+                          chartMetric === "activity"
                             ? "budgetActivity"
-                            : overviewMetricFilter === "reach"
+                            : chartMetric === "reach"
                             ? "budgetReach"
                             : "budgetNominal"
                         }
@@ -9899,21 +10397,21 @@ const Dashboard = ({
                         })}
                         <LabelList
                           dataKey={
-                            overviewMetricFilter === "activity"
+                            chartMetric === "activity"
                               ? "budgetActivity"
-                              : overviewMetricFilter === "reach"
+                              : chartMetric === "reach"
                               ? "budgetReach"
                               : "budgetNominal"
                           }
-                          content={<CustomBudgetLabel metricType={overviewMetricFilter} />}
+                          content={<CustomBudgetLabel metricType={chartMetric} />}
                         />
                       </Bar>
                       <Bar
                         hide={!showActualBar}
                         dataKey={
-                          overviewMetricFilter === "activity"
+                          chartMetric === "activity"
                             ? "actualActivity"
-                            : overviewMetricFilter === "reach"
+                            : chartMetric === "reach"
                             ? "actualReach"
                             : "actualNominal"
                         }
@@ -9945,13 +10443,13 @@ const Dashboard = ({
                         })}
                         <LabelList
                           dataKey={
-                            overviewMetricFilter === "activity"
+                            chartMetric === "activity"
                               ? "actualActivity"
-                              : overviewMetricFilter === "reach"
+                              : chartMetric === "reach"
                               ? "actualReach"
                               : "actualNominal"
                           }
-                          content={<CustomActualLabel metricType={overviewMetricFilter} />}
+                          content={<CustomActualLabel metricType={chartMetric} />}
                         />
                       </Bar>
                     </BarChart>
@@ -9962,138 +10460,300 @@ const Dashboard = ({
 
             {/* KPI Cards Stack (Replacing Segmentasi Partner) */}
             <div className="lg:col-span-4 flex flex-col h-full min-h-0">
-              <div className="flex flex-col gap-3.5 overflow-y-auto max-h-[460px] lg:max-h-[660px] lg:h-[660px] pl-4 pr-5 lg:pl-5 lg:pr-6.5 py-4.5 scrollbar-thin">
-                {activityDonutCardsData.map((act) => {
-                  const isSelected = (act.name === "TOTAL" && activeActivityFilter === null) || (activeActivityFilter === act.name);
-                  const isNominal = overviewMetricFilter === "nominal";
-                  const gap = act.actual - act.budget;
-                  const gapSign = gap > 0 ? "+" : "";
+              <div className={`flex flex-col pl-4 pr-5 lg:pl-5 lg:pr-6.5 py-4.5 ${
+                overviewMetricFilter === "overview"
+                  ? "lg:h-[660px] lg:justify-between gap-4"
+                  : "overflow-y-auto max-h-[460px] lg:max-h-[660px] lg:h-[660px] gap-3.5 scrollbar-thin"
+              }`}>
+                {overviewMetricFilter === "overview" ? (
+                  (() => {
+                    const formatNominalValueLocal = (val: number) => {
+                      const abs = Math.abs(val);
+                      if (abs >= 1000000000) return `${(val / 1000000000).toFixed(1)}M`;
+                      if (abs >= 1000000) return `${(val / 1000000).toFixed(0)}Jt`;
+                      return val.toLocaleString("id-ID");
+                    };
+                    const formatReachValueLocal = (val: number) => {
+                      const abs = Math.abs(val);
+                      if (abs >= 1000000) return `${(val / 1000000).toFixed(1)}M`;
+                      if (abs >= 1000) return `${(val / 1000).toFixed(1)}K`;
+                      return val.toLocaleString("id-ID");
+                    };
+                    const formatActivityValueLocal = (val: number) => {
+                      return val.toLocaleString("id-ID");
+                    };
 
-                  let gapStr = "";
-                  if (isNominal) {
-                    const absGap = Math.abs(gap);
-                    if (absGap >= 1000000000) gapStr = `${gapSign}${(gap / 1000000000).toFixed(1)}M`;
-                    else if (absGap >= 1000000) gapStr = `${gapSign}${(gap / 1000000).toFixed(0)}Jt`;
-                    else gapStr = `${gapSign}${gap.toLocaleString()}`;
-                  } else {
-                    gapStr = `${gapSign}${gap}`;
-                  }
-                  if (gap === 0) gapStr = "0";
+                    const overviewCardsLocal = [
+                      {
+                        key: "activity",
+                        title: "Activity",
+                        subtitle: "Total Kegiatan",
+                        actual: overviewTotals.activity.actual,
+                        budget: overviewTotals.activity.budget,
+                        actualStr: formatActivityValueLocal(overviewTotals.activity.actual),
+                        budgetStr: formatActivityValueLocal(overviewTotals.activity.budget),
+                        pct: overviewTotals.activity.budget > 0 ? Math.round((overviewTotals.activity.actual / overviewTotals.activity.budget) * 100) : 0,
+                        gap: overviewTotals.activity.actual - overviewTotals.activity.budget,
+                      },
+                      {
+                        key: "nominal",
+                        title: "Nominal",
+                        subtitle: "Total Anggaran",
+                        actual: overviewTotals.nominal.actual,
+                        budget: overviewTotals.nominal.budget,
+                        actualStr: formatNominalValueLocal(overviewTotals.nominal.actual),
+                        budgetStr: formatNominalValueLocal(overviewTotals.nominal.budget),
+                        pct: overviewTotals.nominal.budget > 0 ? Math.round((overviewTotals.nominal.actual / overviewTotals.nominal.budget) * 100) : 0,
+                        gap: overviewTotals.nominal.actual - overviewTotals.nominal.budget,
+                      },
+                      {
+                        key: "reach",
+                        title: "Reach",
+                        subtitle: "Farmer Reach",
+                        actual: overviewTotals.reach.actual,
+                        budget: overviewTotals.reach.budget,
+                        actualStr: formatReachValueLocal(overviewTotals.reach.actual),
+                        budgetStr: formatReachValueLocal(overviewTotals.reach.budget),
+                        pct: overviewTotals.reach.budget > 0 ? Math.round((overviewTotals.reach.actual / overviewTotals.reach.budget) * 100) : 0,
+                        gap: overviewTotals.reach.actual - overviewTotals.reach.budget,
+                      }
+                    ];
 
-                  return (
-                    <button
-                      key={act.name}
-                      onClick={() => {
-                        if (act.name === "TOTAL") {
-                          setActiveActivityFilter(null);
-                        } else {
-                          setActiveActivityFilter((prev) => (prev === act.name ? null : act.name));
-                        }
-                      }}
-                      className={`rounded-[32px] lg:w-[94%] lg:mx-auto flex flex-row items-center justify-between relative overflow-hidden group transition-all duration-300 w-full text-left cursor-pointer border-0 ${
-                        act.name === "TOTAL"
-                          ? "min-h-[116px] py-5 px-5 lg:py-6 lg:px-6"
-                          : "min-h-[96px] py-4 px-4 lg:py-5 lg:px-4.5"
-                      } ${
-                        isSelected
-                          ? "bg-gradient-to-r from-[#154be2] to-cyan-500 text-white shadow-[0_12px_32px_rgba(21,75,226,0.25)] scale-[1.02]"
-                          : "bg-white shadow-[0_12px_32px_rgba(21,75,226,0.18)] hover:shadow-[0_16px_40px_rgba(21,75,226,0.28)]"
-                      }`}
-                    >
-                      <div className="flex flex-col justify-center z-10 min-w-0 flex-1 pr-2">
-                        <div>
-                          {/* Abbreviation above full name */}
-                          <div className="mb-0.5">
-                            <span className={`${act.name === "TOTAL" ? "text-[10px] px-2 py-0.5" : "text-[8px] px-1.5 py-0.2"} font-black rounded-md uppercase tracking-wider ${
-                              isSelected
-                                ? "bg-white/20 text-white border border-white/20"
-                                : "bg-[#154be2]/10 text-[#154be2]"
-                            }`}>
-                              {act.name}
+                    return overviewCardsLocal.map((card) => {
+                      const isSelected = overviewSubFilter === card.key;
+                      const pct = card.pct;
+                      const radius = 22;
+                      const circumference = 2 * Math.PI * radius;
+                      const strokeDashoffset = circumference * (1 - Math.min(1, pct / 100));
+
+                      const gap = card.gap;
+                      const gapSign = gap > 0 ? "+" : "";
+
+                      let displayGapStr = "";
+                      if (card.key === "nominal") {
+                        displayGapStr = `${gapSign}${formatNominalValueLocal(gap)}`;
+                      } else if (card.key === "reach") {
+                        displayGapStr = `${gapSign}${formatReachValueLocal(gap)}`;
+                      } else {
+                        displayGapStr = `${gapSign}${gap.toLocaleString("id-ID")}`;
+                      }
+                      if (gap === 0) displayGapStr = "0";
+
+                      // Determine card-specific background and active/inactive shadow styling
+                      let cardStyle = "";
+                      let shadowStyle = "";
+                      
+                      if (card.key === "activity") {
+                        cardStyle = "bg-gradient-to-r from-violet-600 to-indigo-500 text-white border border-violet-400/30";
+                        shadowStyle = isSelected 
+                          ? "shadow-[0_20px_40px_-4px_rgba(109,40,217,0.55)] scale-[1.025] z-10 opacity-100 ring-2 ring-violet-400/30" 
+                          : "shadow-none opacity-[0.76] hover:opacity-[0.92] hover:scale-[1.01] hover:shadow-[0_10px_24px_rgba(109,40,217,0.25)]";
+                      } else if (card.key === "nominal") {
+                        cardStyle = "bg-gradient-to-r from-amber-500 to-orange-500 text-white border border-amber-400/30";
+                        shadowStyle = isSelected 
+                          ? "shadow-[0_20px_40px_-4px_rgba(245,158,11,0.55)] scale-[1.025] z-10 opacity-100 ring-2 ring-amber-400/30" 
+                          : "shadow-none opacity-[0.76] hover:opacity-[0.92] hover:scale-[1.01] hover:shadow-[0_10px_24px_rgba(245,158,11,0.25)]";
+                      } else {
+                        cardStyle = "bg-gradient-to-r from-emerald-600 to-teal-500 text-white border border-emerald-400/30";
+                        shadowStyle = isSelected 
+                          ? "shadow-[0_20px_40px_-4px_rgba(5,150,105,0.55)] scale-[1.025] z-10 opacity-100 ring-2 ring-emerald-400/30" 
+                          : "shadow-none opacity-[0.76] hover:opacity-[0.92] hover:scale-[1.01] hover:shadow-[0_10px_24px_rgba(5,150,105,0.25)]";
+                      }
+
+                      return (
+                        <button
+                          key={card.key}
+                          onClick={() => setOverviewSubFilter(card.key as any)}
+                          className={`rounded-[32px] lg:w-[94%] lg:mx-auto flex flex-row items-center justify-between relative overflow-hidden group transition-all duration-300 w-full text-left cursor-pointer border-0 p-5 lg:flex-1 lg:min-h-0 min-h-[110px] ${cardStyle} ${shadowStyle}`}
+                        >
+                          <div className="flex flex-col justify-center z-10 min-w-0 flex-1 pr-2">
+                            <div className="mb-0.5">
+                              <span className="text-[9px] px-2 py-0.5 font-black rounded-md uppercase tracking-wider bg-white/20 text-white border border-white/10">
+                                {card.title}
+                              </span>
+                            </div>
+                            <h4 className="text-[15px] font-black leading-tight truncate text-white">
+                              {card.subtitle}
+                            </h4>
+                            <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                              <span className="font-sans font-black text-[13px] text-white">
+                                {card.actualStr}
+                              </span>
+                              <span className="text-white/40">/</span>
+                              <span className="font-sans font-extrabold text-[12.5px] text-white/80">
+                                {card.budgetStr}
+                              </span>
+                              <span className="ml-1 px-1.5 py-0.5 rounded text-[11px] font-black bg-white/20 text-white border border-white/10">
+                                {displayGapStr}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Circular Progress */}
+                          <div className="relative size-16 flex items-center justify-center shrink-0 z-10">
+                            <svg className="absolute inset-0 size-full rotate-[-90deg]">
+                              <circle
+                                cx="32"
+                                cy="32"
+                                r={radius}
+                                stroke="rgba(255,255,255,0.25)"
+                                strokeWidth="5.5"
+                                fill="transparent"
+                              />
+                              <circle
+                                cx="32"
+                                cy="32"
+                                r={radius}
+                                stroke="#ffffff"
+                                strokeWidth="5.5"
+                                fill="transparent"
+                                strokeDasharray={circumference}
+                                strokeDashoffset={strokeDashoffset}
+                                strokeLinecap="round"
+                                className="transition-all duration-500 ease-out"
+                              />
+                            </svg>
+                            <span className="font-black text-[11.5px] text-white">
+                              {pct}%
                             </span>
                           </div>
-                          <h4 className={`${act.name === "TOTAL" ? "text-[16px] lg:text-[17px]" : "text-[12px] lg:text-[12.5px]"} font-black leading-tight truncate max-w-[180px] lg:max-w-[220px] ${
-                            isSelected ? "text-white" : "text-[#181a2c]"
-                          }`} title={act.fullName}>
-                            {act.fullName}
-                          </h4>
-                        </div>
-                        <div className="mt-1.5">
-                          <div className={`font-sans font-extrabold ${act.name === "TOTAL" ? "text-[12.5px] lg:text-[13px]" : "text-[12.5px] lg:text-[13.5px]"} ${isSelected ? "text-white" : ""} flex items-center gap-1.5 flex-wrap`}>
-                            <span className={isSelected ? "text-white font-black" : "text-[#06b6d4]"}>
-                              {act.actualStr}
-                            </span>
-                            <span className={isSelected ? "text-white/50" : "text-[#8E94B7]"}>
-                              /
-                            </span>
-                            <span className={isSelected ? "text-white/85" : "text-[#154be2]"}>
-                              {act.budgetStr}
-                            </span>
-                            <span className={`ml-1.5 px-2 py-0.5 rounded font-black ${
-                              act.name === "TOTAL"
-                                ? "text-[12px] lg:text-[12.5px]"
-                                : "text-[12.5px] lg:text-[13.5px]"
-                            } ${
-                              isSelected
-                                ? "bg-white/20 text-white"
-                                : gap >= 0
-                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-100/50"
-                                  : "bg-rose-50 text-rose-700 border border-rose-100/50"
-                            }`}>
-                              {gapStr}
-                            </span>
+                        </button>
+                      );
+                    });
+                  })()
+                ) : (
+                  activityDonutCardsData.map((act) => {
+                    const isSelected = (act.name === "TOTAL" && activeActivityFilter === null) || (activeActivityFilter === act.name);
+                    const isNominal = overviewMetricFilter === "nominal";
+                    const gap = act.actual - act.budget;
+                    const gapSign = gap > 0 ? "+" : "";
+
+                    let gapStr = "";
+                    if (isNominal) {
+                      const absGap = Math.abs(gap);
+                      if (absGap >= 1000000000) gapStr = `${gapSign}${(gap / 1000000000).toFixed(1)}M`;
+                      else if (absGap >= 1000000) gapStr = `${gapSign}${(gap / 1000000).toFixed(0)}Jt`;
+                      else gapStr = `${gapSign}${gap.toLocaleString()}`;
+                    } else {
+                      gapStr = `${gapSign}${gap}`;
+                    }
+                    if (gap === 0) gapStr = "0";
+
+                    return (
+                      <button
+                        key={act.name}
+                        onClick={() => {
+                          if (act.name === "TOTAL") {
+                            setActiveActivityFilter(null);
+                          } else {
+                            setActiveActivityFilter((prev) => (prev === act.name ? null : act.name));
+                          }
+                        }}
+                        className={`rounded-[32px] lg:w-[94%] lg:mx-auto flex flex-row items-center justify-between relative overflow-hidden group transition-all duration-300 w-full text-left cursor-pointer border-0 ${
+                          act.name === "TOTAL"
+                            ? "min-h-[116px] py-5 px-5 lg:py-6 lg:px-6"
+                            : "min-h-[96px] py-4 px-4 lg:py-5 lg:px-4.5"
+                        } ${
+                          isSelected
+                            ? "bg-gradient-to-r from-[#154be2] to-cyan-500 text-white shadow-[0_12px_32px_rgba(21,75,226,0.25)] scale-[1.02]"
+                            : "bg-white shadow-[0_12px_32px_rgba(21,75,226,0.18)] hover:shadow-[0_16px_40px_rgba(21,75,226,0.28)]"
+                        }`}
+                      >
+                        <div className="flex flex-col justify-center z-10 min-w-0 flex-1 pr-2">
+                          <div>
+                            {/* Abbreviation above full name */}
+                            <div className="mb-0.5">
+                              <span className={`${act.name === "TOTAL" ? "text-[10px] px-2 py-0.5" : "text-[8px] px-1.5 py-0.2"} font-black rounded-md uppercase tracking-wider ${
+                                isSelected
+                                  ? "bg-white/20 text-white border border-white/20"
+                                  : "bg-[#154be2]/10 text-[#154be2]"
+                              }`}>
+                                {act.name}
+                              </span>
+                            </div>
+                            <h4 className={`${act.name === "TOTAL" ? "text-[16px] lg:text-[17px]" : "text-[12px] lg:text-[12.5px]"} font-black leading-tight truncate max-w-[180px] lg:max-w-[220px] ${
+                              isSelected ? "text-white" : "text-[#181a2c]"
+                            }`} title={act.fullName}>
+                              {act.fullName}
+                            </h4>
+                          </div>
+                          <div className="mt-1.5">
+                            <div className={`font-sans font-extrabold ${act.name === "TOTAL" ? "text-[12.5px] lg:text-[13px]" : "text-[12.5px] lg:text-[13.5px]"} ${isSelected ? "text-white" : ""} flex items-center gap-1.5 flex-wrap`}>
+                              <span className={isSelected ? "text-white font-black" : "text-[#06b6d4]"}>
+                                {act.actualStr}
+                              </span>
+                              <span className={isSelected ? "text-white/50" : "text-[#8E94B7]"}>
+                                /
+                              </span>
+                              <span className={isSelected ? "text-white/85" : "text-[#154be2]"}>
+                                {act.budgetStr}
+                              </span>
+                              <span className={`ml-1.5 px-2 py-0.5 rounded font-black ${
+                                act.name === "TOTAL"
+                                  ? "text-[12px] lg:text-[12.5px]"
+                                  : "text-[12.5px] lg:text-[13.5px]"
+                              } ${
+                                isSelected
+                                  ? "bg-white/20 text-white"
+                                  : gap >= 0
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-100/50"
+                                    : "bg-rose-50 text-rose-700 border border-rose-100/50"
+                              }`}>
+                                {gapStr}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-   
-                      {/* Enriched Donut Chart Wrapper */}
-                      <div className="flex flex-col items-center justify-center shrink-0 z-10 pl-1">
-                        {/* Donut Chart Visual */}
-                        <div className={`relative shrink-0 ${act.name === "TOTAL" ? "size-22" : "size-18"}`}>
-                          <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                              <Pie
-                                data={act.chartData}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={act.name === "TOTAL" ? 28 : 22}
-                                outerRadius={act.name === "TOTAL" ? 38 : 31}
-                                startAngle={90}
-                                endAngle={-270}
-                                paddingAngle={1}
-                                dataKey="value"
-                              >
-                                {act.chartData.map((entry, idx) => {
-                                  let fill = entry.fill;
-                                  if (isSelected) {
-                                    fill = entry.name === "Actual" ? "#ffffff" : "rgba(255,255,255,0.25)";
-                                  } else {
-                                    if (act.name === "TOTAL" && entry.name === "Actual") {
-                                      fill = "#06b6d4";
+     
+                        {/* Enriched Donut Chart Wrapper */}
+                        <div className="flex flex-col items-center justify-center shrink-0 z-10 pl-1">
+                          {/* Donut Chart Visual */}
+                          <div className={`relative shrink-0 ${act.name === "TOTAL" ? "size-22" : "size-18"}`}>
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Pie
+                                  data={act.chartData}
+                                  cx="50%"
+                                  cy="50%"
+                                  innerRadius={act.name === "TOTAL" ? 28 : 22}
+                                  outerRadius={act.name === "TOTAL" ? 38 : 31}
+                                  startAngle={90}
+                                  endAngle={-270}
+                                  paddingAngle={1}
+                                  dataKey="value"
+                                >
+                                  {act.chartData.map((entry, idx) => {
+                                    let fill = entry.fill;
+                                    if (isSelected) {
+                                      fill = entry.name === "Actual" ? "#ffffff" : "rgba(255,255,255,0.25)";
+                                    } else {
+                                      if (act.name === "TOTAL" && entry.name === "Actual") {
+                                        fill = "#06b6d4";
+                                      }
                                     }
-                                  }
-                                  return <Cell key={`cell-${idx}`} fill={fill} />;
-                                })}
-                              </Pie>
-                            </PieChart>
-                          </ResponsiveContainer>
-                          {/* Center percentage indicator */}
-                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <span className={`font-black ${
-                              act.name === "TOTAL"
-                                ? "text-[14px]"
-                                : "text-[11.5px]"
-                            } ${
-                              isSelected ? "text-white" : act.name === "TOTAL" ? "text-[#154be2]" : "text-[#181a2c]"
-                            }`}>
-                              {act.percentage}%
-                            </span>
+                                    return <Cell key={`cell-${idx}`} fill={fill} />;
+                                  })}
+                                </Pie>
+                              </PieChart>
+                            </ResponsiveContainer>
+                            {/* Center percentage indicator */}
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                              <span className={`font-black ${
+                                act.name === "TOTAL"
+                                  ? "text-[14px]"
+                                  : "text-[11.5px]"
+                              } ${
+                                isSelected ? "text-white" : act.name === "TOTAL" ? "text-[#154be2]" : "text-[#181a2c]"
+                              }`}>
+                                {act.percentage}%
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </button>
-                  );
-                })}
+                      </button>
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>
@@ -10343,7 +11003,7 @@ const Dashboard = ({
                   />
                   <XAxis
                     dataKey="name"
-                    tick={<CustomXAxisTick chartData={overviewHistoryData} metricType={overviewMetricFilter} />}
+                    tick={<CustomXAxisTick chartData={overviewHistoryData} metricType={chartMetric} />}
                     axisLine={false}
                     tickLine={false}
                     interval={0}
@@ -10358,14 +11018,24 @@ const Dashboard = ({
                   />
                   <Tooltip
                     cursor={{ fill: "rgba(21, 75, 226, 0.03)" }}
-                    content={<CustomChartTooltip metricType={overviewMetricFilter} dismissedLabel={dismissedTooltipLabel} />}
+                    wrapperStyle={{ pointerEvents: "auto" }}
+                    content={
+                      <CustomChartTooltip
+                        metricType={chartMetric}
+                        dismissedLabel={dismissedTooltipLabel}
+                        onClose={(lbl: string) => {
+                          setDismissedTooltipLabel(lbl);
+                          setActiveMainBarKey(null);
+                        }}
+                      />
+                    }
                   />
                   <Bar
                     hide={!showBudgetBar}
                     dataKey={
-                      overviewMetricFilter === "activity"
+                      chartMetric === "activity"
                         ? "budgetActivity"
-                        : overviewMetricFilter === "reach"
+                        : chartMetric === "reach"
                         ? "budgetReach"
                         : "budgetNominal"
                     }
@@ -10397,21 +11067,21 @@ const Dashboard = ({
                     })}
                     <LabelList
                       dataKey={
-                        overviewMetricFilter === "activity"
+                        chartMetric === "activity"
                           ? "budgetActivity"
-                          : overviewMetricFilter === "reach"
+                          : chartMetric === "reach"
                           ? "budgetReach"
                           : "budgetNominal"
                       }
-                      content={<CustomBudgetLabel metricType={overviewMetricFilter} />}
+                      content={<CustomBudgetLabel metricType={chartMetric} />}
                     />
                   </Bar>
                   <Bar
                     hide={!showActualBar}
                     dataKey={
-                      overviewMetricFilter === "activity"
+                      chartMetric === "activity"
                         ? "actualActivity"
-                        : overviewMetricFilter === "reach"
+                        : chartMetric === "reach"
                         ? "actualReach"
                         : "actualNominal"
                     }
@@ -10443,13 +11113,13 @@ const Dashboard = ({
                     })}
                     <LabelList
                       dataKey={
-                        overviewMetricFilter === "activity"
+                        chartMetric === "activity"
                           ? "actualActivity"
-                          : overviewMetricFilter === "reach"
+                          : chartMetric === "reach"
                           ? "actualReach"
                           : "actualNominal"
                       }
-                      content={<CustomActualLabel metricType={overviewMetricFilter} />}
+                      content={<CustomActualLabel metricType={chartMetric} />}
                     />
                   </Bar>
                 </BarChart>
@@ -10650,18 +11320,33 @@ const Dashboard = ({
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e2e8f0" />
-                        <XAxis dataKey="name" tick={<CustomXAxisTick chartData={focusedChartType === "sub" ? overviewStats.subChartData : overviewStats.areaChartData} metricType={overviewMetricFilter} />} axisLine={false} tickLine={false} interval={0} height={65} />
+                        <XAxis dataKey="name" tick={<CustomXAxisTick chartData={focusedChartType === "sub" ? overviewStats.subChartData : overviewStats.areaChartData} metricType={chartMetric} />} axisLine={false} tickLine={false} interval={0} height={65} />
                         <YAxis hide={true} domain={[0, (dataMax: any) => (dataMax === 0 ? 100 : Math.round(dataMax * 1.25))]} tick={{ fill: "#8E94B7", fontSize: 10, fontWeight: 500 }} axisLine={false} tickLine={false} />
                         <Tooltip
                           cursor={{ fill: "rgba(21, 75, 226, 0.03)" }}
-                          content={<CustomChartTooltip metricType={overviewMetricFilter} dismissedLabel={focusedChartType === "sub" ? dismissedSubTooltipLabel : dismissedTooltipLabel} />}
+                          wrapperStyle={{ pointerEvents: "auto" }}
+                          content={
+                            <CustomChartTooltip
+                              metricType={chartMetric}
+                              dismissedLabel={focusedChartType === "sub" ? dismissedSubTooltipLabel : dismissedTooltipLabel}
+                              onClose={(lbl: string) => {
+                                if (focusedChartType === "sub") {
+                                  setDismissedSubTooltipLabel(lbl);
+                                  setActiveSubBarKey(null);
+                                } else {
+                                  setDismissedTooltipLabel(lbl);
+                                  setActiveMainBarKey(null);
+                                }
+                              }}
+                            />
+                          }
                         />
                         <Bar
                           hide={!showBudgetBar}
                           dataKey={
-                            overviewMetricFilter === "activity"
+                            chartMetric === "activity"
                               ? "budgetActivity"
-                              : overviewMetricFilter === "reach"
+                              : chartMetric === "reach"
                               ? "budgetReach"
                               : "budgetNominal"
                           }
@@ -10704,21 +11389,21 @@ const Dashboard = ({
                           })}
                           <LabelList
                             dataKey={
-                              overviewMetricFilter === "activity"
+                              chartMetric === "activity"
                                 ? "budgetActivity"
-                                : overviewMetricFilter === "reach"
+                                : chartMetric === "reach"
                                 ? "budgetReach"
                                 : "budgetNominal"
                             }
-                            content={<CustomBudgetLabel metricType={overviewMetricFilter} />}
+                            content={<CustomBudgetLabel metricType={chartMetric} />}
                           />
                         </Bar>
                         <Bar
                           hide={!showActualBar}
                           dataKey={
-                            overviewMetricFilter === "activity"
+                            chartMetric === "activity"
                               ? "actualActivity"
-                              : overviewMetricFilter === "reach"
+                              : chartMetric === "reach"
                               ? "actualReach"
                               : "actualNominal"
                           }
@@ -10761,13 +11446,13 @@ const Dashboard = ({
                           })}
                           <LabelList
                             dataKey={
-                              overviewMetricFilter === "activity"
+                              chartMetric === "activity"
                                 ? "actualActivity"
-                                : overviewMetricFilter === "reach"
+                                : chartMetric === "reach"
                                 ? "actualReach"
                                 : "actualNominal"
                             }
-                            content={<CustomActualLabel metricType={overviewMetricFilter} />}
+                            content={<CustomActualLabel metricType={chartMetric} />}
                           />
                         </Bar>
                       </BarChart>
@@ -13434,7 +14119,7 @@ const Dashboard = ({
                   Propose Activity
                 </h1>
                 <p className="text-[#8E94B7] text-[11px] font-semibold tracking-wide mt-0.5">
-                  Formulir pengajuan kegiatan promosi dan demo produk RADAR DG
+                  Formulir pengajuan promosi dan demo produk RADAR DG
                 </p>
               </div>
             </div>
@@ -13518,14 +14203,14 @@ const Dashboard = ({
                   {(proposeCategory === "Regular" ? ["Farmer meeting", "Farmer field day", "One day promo", "Special field trip"] : ["AIC", "Expo", "Caravan", "Retailer Meeting"]).map((act) => {
                     const isSelected = proposeActivity === act;
                     const budgets: Record<string, {actual: number, remaining: number}> = {
-                      "Farmer meeting": { actual: 5000000, remaining: 12000000 },
-                      "Farmer field day": { actual: 8000000, remaining: 20000000 },
-                      "One day promo": { actual: 2000000, remaining: 5000000 },
-                      "Special field trip": { actual: 15000000, remaining: 35000000 },
-                      "AIC": { actual: 3000000, remaining: 10000000 },
-                      "Expo": { actual: 25000000, remaining: 50000000 },
-                      "Caravan": { actual: 10000000, remaining: 25000000 },
-                      "Retailer Meeting": { actual: 4000000, remaining: 8000000 },
+                      "Farmer meeting": { actual: 5, remaining: 12 },
+                      "Farmer field day": { actual: 3, remaining: 8 },
+                      "One day promo": { actual: 2, remaining: 5 },
+                      "Special field trip": { actual: 1, remaining: 4 },
+                      "AIC": { actual: 4, remaining: 10 },
+                      "Expo": { actual: 1, remaining: 3 },
+                      "Caravan": { actual: 2, remaining: 6 },
+                      "Retailer Meeting": { actual: 3, remaining: 7 },
                     };
                     const b = budgets[act] || { actual: 0, remaining: 0 };
                     
@@ -13544,11 +14229,11 @@ const Dashboard = ({
                         <div className="mt-auto w-full">
                           <div className="flex justify-between items-center text-[9px] mb-0.5">
                             <span className="text-slate-400 font-medium">Actual:</span>
-                            <span className="font-semibold text-slate-700">Rp{(b.actual/1000000).toFixed(1)}M</span>
+                            <span className="font-semibold text-slate-700">{b.actual}</span>
                           </div>
                           <div className="flex justify-between items-center text-[9px]">
                             <span className="text-slate-400 font-medium">Remaining:</span>
-                            <span className="font-bold text-emerald-600">Rp{(b.remaining/1000000).toFixed(1)}M</span>
+                            <span className="font-bold text-emerald-600">{b.remaining}</span>
                           </div>
                         </div>
                       </button>
@@ -13597,11 +14282,26 @@ const Dashboard = ({
                   <div className="overflow-x-auto">
                     {(() => {
                       const rawData = [
-                        { id: "L1", district: "Malang", subDistrict: "Waru", budget: 1500000, month: "Agustus", status: "Remaining" },
-                        { id: "L2", district: "Malang", subDistrict: "Singosari", budget: 2000000, month: "September", status: "Complete" },
-                        { id: "L3", district: "Pasuruan", subDistrict: "Bangil", budget: 1200000, month: "Oktober", status: "Remaining" },
-                        { id: "L4", district: "Pasuruan", subDistrict: "Pandaan", budget: 1800000, month: "Agustus", status: "Complete" },
-                        { id: "L5", district: "Batu", subDistrict: "Bumiaji", budget: 1500000, month: "November", status: "Remaining" },
+                        { id: "L1", district: "Malang", subDistrict: "Waru", budget: 300000, month: "Agustus", status: "Remaining" },
+                        { id: "L2", district: "Malang", subDistrict: "Singosari", budget: 300000, month: "September", status: "Complete" },
+                        { id: "L3", district: "Pasuruan", subDistrict: "Bangil", budget: 300000, month: "Oktober", status: "Remaining" },
+                        { id: "L4", district: "Pasuruan", subDistrict: "Pandaan", budget: 300000, month: "Agustus", status: "Complete" },
+                        { id: "L5", district: "Batu", subDistrict: "Bumiaji", budget: 300000, month: "November", status: "Remaining" },
+                        { id: "L6", district: "Batu", subDistrict: "Junrejo", budget: 300000, month: "September", status: "Remaining" },
+                        { id: "L7", district: "Kediri", subDistrict: "Pare", budget: 300000, month: "Agustus", status: "Remaining" },
+                        { id: "L8", district: "Kediri", subDistrict: "Ngadiluwih", budget: 300000, month: "September", status: "Complete" },
+                        { id: "L9", district: "Nganjuk", subDistrict: "Loceret", budget: 300000, month: "Oktober", status: "Remaining" },
+                        { id: "L10", district: "Nganjuk", subDistrict: "Tanjunganom", budget: 300000, month: "November", status: "Remaining" },
+                        { id: "L11", district: "Probolinggo", subDistrict: "Kraksaan", budget: 300000, month: "Agustus", status: "Complete" },
+                        { id: "L12", district: "Probolinggo", subDistrict: "Paiton", budget: 300000, month: "September", status: "Remaining" },
+                        { id: "L13", district: "Malang", subDistrict: "Kepanjen", budget: 300000, month: "Oktober", status: "Remaining" },
+                        { id: "L14", district: "Malang", subDistrict: "Karangploso", budget: 300000, month: "November", status: "Complete" },
+                        { id: "L15", district: "Pasuruan", subDistrict: "Purwosari", budget: 300000, month: "Agustus", status: "Remaining" },
+                        { id: "L16", district: "Pasuruan", subDistrict: "Grati", budget: 300000, month: "September", status: "Remaining" },
+                        { id: "L17", district: "Batu", subDistrict: "Batu", budget: 300000, month: "Oktober", status: "Complete" },
+                        { id: "L18", district: "Kediri", subDistrict: "Mojo", budget: 300000, month: "November", status: "Remaining" },
+                        { id: "L19", district: "Nganjuk", subDistrict: "Bagor", budget: 300000, month: "September", status: "Remaining" },
+                        { id: "L20", district: "Probolinggo", subDistrict: "Sukapura", budget: 300000, month: "Oktober", status: "Remaining" },
                       ];
                       
                       const uniqueDistricts = Array.from(new Set(rawData.map(r => r.district))).sort();
@@ -13670,9 +14370,9 @@ const Dashboard = ({
                                 btnText = row.month;
                                 disabled = true;
                               } else if (isProcessing) {
-                                btnClass = "bg-yellow-400 text-yellow-950 border border-yellow-500 cursor-not-allowed font-bold";
+                                btnClass = "bg-yellow-400 hover:bg-yellow-500 text-yellow-950 border border-yellow-500 font-bold";
                                 btnText = "Process";
-                                disabled = true;
+                                disabled = false;
                               }
 
                               return (
@@ -13687,6 +14387,15 @@ const Dashboard = ({
                                         type="button"
                                         disabled={disabled}
                                         onClick={() => {
+                                          if (isProcessing) {
+                                            setProcessingRows((prev) => {
+                                              const next = { ...prev };
+                                              delete next[row.id];
+                                              return next;
+                                            });
+                                            setGeneratedProjects((prev) => prev.filter((p) => p.rowId !== row.id));
+                                            return;
+                                          }
                                           const monthMapIndo: Record<string, number> = {
                                             "januari": 0, "februari": 1, "maret": 2, "april": 3, "mei": 4, "juni": 5,
                                             "juli": 6, "agustus": 7, "september": 8, "oktober": 9, "november": 10, "desember": 11
@@ -13815,6 +14524,7 @@ const Dashboard = ({
                                 const showRedBg = proposalSubmitAttempted && isFarmerEmpty;
                                 return (
                                   <input
+                                    id={`farmer-input-${idx}`}
                                     type="number"
                                     min="0"
                                     placeholder="0"
@@ -13825,6 +14535,16 @@ const Dashboard = ({
                                         prev.map((p) => (p.id === proj.id ? { ...p, farmerReach: val } : p))
                                       );
                                     }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        const nextInput = document.getElementById(`farmer-input-${idx + 1}`);
+                                        if (nextInput) {
+                                          nextInput.focus();
+                                          (nextInput as HTMLInputElement).select();
+                                        }
+                                      }
+                                    }}
                                     className={`w-16 px-1.5 py-1 text-[10px] font-bold border rounded-lg transition-all ${
                                       showRedBg
                                         ? "bg-red-100 text-red-900 border-red-500 ring-1 ring-red-300 focus:outline-none focus:border-red-600 focus:ring-red-200"
@@ -13834,10 +14554,8 @@ const Dashboard = ({
                                 );
                               })()}
                             </td>
-                            <td className="px-4 py-2.5">
-                              <span className="inline-block px-2.5 py-1 text-[10px] font-extrabold text-slate-700 bg-slate-100 rounded-lg border border-slate-200 shadow-sm">
-                                {proj.hybrids || "ADV JAGO"}
-                              </span>
+                            <td className="px-4 py-2.5 text-[10px] font-semibold text-[#8E94B7]">
+                              {proj.hybrids || "ADV JAGO"}
                             </td>
                             <td className="px-4 py-2.5 text-right">
                               <button
@@ -14167,134 +14885,308 @@ const Dashboard = ({
       )}
 
       {/* PDF Export Preview Modal */}
-      {isPreviewPdfModalOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-250 p-4">
-          <div className="bg-slate-50 rounded-[28px] shadow-[0_24px_60px_rgba(15,23,42,0.3)] border border-slate-200/80 w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-            {/* Header */}
-            <div className="px-6 py-4 bg-white border-b border-slate-150 flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#154be2]">picture_as_pdf</span>
-                <span className="text-sm font-extrabold text-slate-800 uppercase tracking-wider">Pratinjau Dokumen Ekspor (A4 PDF)</span>
+      {isPreviewPdfModalOpen && (() => {
+        const employeeName = proposalsList.length > 0 ? proposalsList[0].bs : "Addin Aji Haryanto";
+        const monthsEng = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        const dObj = new Date();
+        const documentDate = `${monthsEng[dObj.getMonth()]} ${dObj.getDate()}, 2026`;
+        const romanMonths = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
+        const monthRoman = romanMonths[dObj.getMonth()] || "VII";
+        let initials = "ADTO";
+        if (employeeName) {
+          const parts = employeeName.trim().split(/\s+/);
+          if (parts.length >= 2) {
+            initials = (parts[0].substring(0, 2) + parts[parts.length - 1].substring(0, 2)).toUpperCase();
+          } else if (parts.length === 1) {
+            initials = parts[0].substring(0, 4).toUpperCase();
+          }
+        }
+        const claimNo = `03/AD.SALE/${monthRoman}/2026-${initials}`;
+        const totalAdvance = proposalsList.reduce((sum, p) => sum + (p.budget ? Number(p.budget) : 0), 0);
+
+        const groupedProposals: Array<{
+          activity: string;
+          category: string;
+          budget: number;
+          count: number;
+        }> = [];
+
+        proposalsList.forEach((p) => {
+          const existing = groupedProposals.find(
+            (g) => g.activity === p.activity && g.category === p.category
+          );
+          if (existing) {
+            existing.budget += p.budget ? Number(p.budget) : 0;
+            existing.count += 1;
+          } else {
+            groupedProposals.push({
+              activity: p.activity,
+              category: p.category,
+              budget: p.budget ? Number(p.budget) : 0,
+              count: 1,
+            });
+          }
+        });
+
+        return (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-250 p-4">
+            <div className="bg-slate-50 rounded-[28px] shadow-[0_24px_60px_rgba(15,23,42,0.3)] border border-slate-200/80 w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+              {/* Header */}
+              <div className="px-6 py-4 bg-white border-b border-slate-150 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#154be2]">picture_as_pdf</span>
+                  <span className="text-sm font-extrabold text-slate-800 uppercase tracking-wider">Pratinjau Dokumen Ekspor (A4 PDF)</span>
+                </div>
+                <button 
+                  onClick={() => setIsPreviewPdfModalOpen(false)}
+                  className="text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-lg">close</span>
+                </button>
               </div>
-              <button 
-                onClick={() => setIsPreviewPdfModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-lg">close</span>
-              </button>
-            </div>
 
-            {/* Document Preview Area */}
-            <div className="flex-1 overflow-y-auto p-6 md:p-10 flex justify-center bg-slate-100">
-              {/* Fake A4 Sheet */}
-              <div className="bg-white w-full max-w-[210mm] shadow-md border border-slate-200/60 p-8 md:p-12 text-slate-800 flex flex-col font-sans text-xs min-h-[297mm]">
-                
-                {/* Header */}
-                <div className="flex justify-between items-start border-b-2 border-[#154be2] pb-5 mb-6">
-                  <div>
-                    <h2 className="text-base font-extrabold text-[#154be2] tracking-tight uppercase">Laporan Pengajuan Kegiatan</h2>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Sistem Pendataan Digital RADAR DG</p>
+              {/* Document Preview Area */}
+              <div className="flex-1 overflow-y-auto p-6 md:p-10 flex flex-col items-center gap-8 bg-slate-100">
+                {/* Fake A4 Sheet - Page 1 */}
+                <div className="bg-white w-full max-w-[210mm] shadow-md border border-slate-200/60 p-8 md:p-10 text-slate-800 flex flex-col font-sans text-xs min-h-[297mm] relative">
+                  
+                  {/* PT. ADVANTA SEEDS INDONESIA */}
+                  <div className="text-left font-bold text-[10px] tracking-tight uppercase text-slate-800 mb-2">
+                    PT. ADVANTA SEEDS INDONESIA
                   </div>
-                  <div className="text-right">
-                    <div className="text-[#154be2] font-black text-sm tracking-widest">RADAR DG</div>
-                    <p className="text-[9px] font-extrabold text-slate-400 uppercase mt-0.5">Advanta Seeds Indonesia</p>
-                  </div>
-                </div>
 
-                {/* Metadata Info */}
-                <div className="grid grid-cols-2 gap-4 mb-6 bg-slate-50/50 p-4 rounded-xl border border-slate-100 text-[10px] font-bold">
-                  <div>
-                    <div className="flex justify-between py-1 border-b border-slate-100">
-                      <span className="text-slate-400">Dicetak Oleh:</span>
-                      <span className="text-slate-700">Business Specialist</span>
-                    </div>
-                    <div className="flex justify-between py-1">
-                      <span className="text-slate-400">Sistem Aplikasi:</span>
-                      <span className="text-[#154be2]">RADAR DG Application v1.0</span>
-                    </div>
+                  {/* Banner */}
+                  <div className="bg-gray-100 py-2.5 mb-6 flex justify-center items-center rounded border border-gray-200">
+                    <h1 className="text-xl font-black text-slate-800 tracking-wider">BUSINESS ADVANCE</h1>
                   </div>
-                  <div>
-                    <div className="flex justify-between py-1 border-b border-slate-100">
-                      <span className="text-slate-400">Tanggal Dokumen:</span>
-                      <span className="text-slate-700">{new Date().toLocaleDateString("id-ID", { year: 'numeric', month: 'long', day: 'numeric' })}</span>
-                    </div>
-                    <div className="flex justify-between py-1">
-                      <span className="text-slate-400">Total Pengajuan:</span>
-                      <span className="text-emerald-600">{proposalsList.length} Proyek</span>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Content Table */}
-                <div className="flex-1 overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-[9.5px]">
-                    <thead>
-                      <tr className="bg-[#154be2] text-white">
-                        <th className="px-3 py-2 font-bold uppercase tracking-wider rounded-l-md">Project No</th>
-                        <th className="px-3 py-2 font-bold uppercase tracking-wider">BS Name</th>
-                        <th className="px-3 py-2 font-bold uppercase tracking-wider">Jenis Kegiatan</th>
-                        <th className="px-3 py-2 font-bold uppercase tracking-wider">Wilayah</th>
-                        <th className="px-2 py-2 font-bold uppercase tracking-wider text-center">Farmers</th>
-                        <th className="px-3 py-2 font-bold uppercase tracking-wider">Varietas</th>
-                        <th className="px-3 py-2 font-bold uppercase tracking-wider text-right rounded-r-md">Anggaran (IDR)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {proposalsList.map((p, idx) => (
-                        <tr key={p.id || idx} className="hover:bg-slate-50/50">
-                          <td className="px-3 py-2.5 font-mono font-bold text-[#154be2]">{p.projectNo}</td>
-                          <td className="px-3 py-2.5 font-bold text-slate-700">{p.bs}</td>
-                          <td className="px-3 py-2.5 text-slate-600 font-semibold">{p.activity}</td>
-                          <td className="px-3 py-2.5 text-slate-500 font-medium">{p.district}, {p.subDistrict}</td>
-                          <td className="px-2 py-2.5 text-slate-700 font-bold text-center">{p.farmerReach ? Number(p.farmerReach).toLocaleString() : "0"}</td>
-                          <td className="px-3 py-2.5 text-slate-600 font-medium">{p.hybrids || "-"}</td>
-                          <td className="px-3 py-2.5 text-right font-bold text-slate-700">Rp {p.budget ? Number(p.budget).toLocaleString() : "0"}</td>
+                  {/* Metadata Info */}
+                  <div className="grid grid-cols-2 gap-8 text-[11px] mb-6">
+                    <div className="space-y-1.5">
+                      <div className="flex">
+                        <span className="w-32 text-slate-500 font-semibold">Employee Name</span>
+                        <span className="mr-2 font-bold">:</span>
+                        <span className="font-bold text-slate-800">{employeeName}</span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-32 text-slate-500 font-semibold">Employee Code</span>
+                        <span className="mr-2 font-bold">:</span>
+                        <span className="font-bold text-slate-800">0</span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-32 text-slate-500 font-semibold">Department</span>
+                        <span className="mr-2 font-bold">:</span>
+                        <span className="font-bold text-slate-800">SALES</span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-32 text-slate-500 font-semibold">Cost Center</span>
+                        <span className="mr-2 font-bold">:</span>
+                        <span className="font-bold text-slate-800">A60305</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <div className="flex">
+                        <span className="w-20 text-slate-500 font-semibold">Date</span>
+                        <span className="mr-2 font-bold">:</span>
+                        <span className="font-bold text-slate-800">{documentDate}</span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-20 text-slate-500 font-semibold">Claim No</span>
+                        <span className="mr-2 font-bold">:</span>
+                        <span className="font-bold text-slate-800 font-mono">{claimNo}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Content Table */}
+                  <div className="border border-slate-300 rounded-sm overflow-hidden mb-6">
+                    <table className="w-full text-left border-collapse text-[10px]">
+                      <thead>
+                        <tr className="bg-gray-100 border-b border-slate-300 text-slate-700 font-bold">
+                          <th className="px-2 py-1 border-r border-slate-300 text-center w-8">No.</th>
+                          <th className="px-2 py-1 border-r border-slate-300 text-center w-20">GL Code</th>
+                          <th className="px-3 py-1 border-r border-slate-300 text-left">GL Description</th>
+                          <th className="px-2 py-1 border-r border-slate-300 text-center w-28">Category</th>
+                          <th className="px-2 py-1 border-r border-slate-300 text-center w-24">Cost Center</th>
+                          <th className="px-3 py-1 border-r border-slate-300 text-right w-28">Total</th>
+                          <th className="px-3 py-1 text-left w-32">Annexure</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {Array.from({ length: 24 }).map((_, idx) => {
+                          const p = groupedProposals[idx];
+                          const hasData = !!p;
+                          return (
+                            <tr key={idx} className="h-[20px] hover:bg-slate-50/40">
+                              <td className="px-2 py-0.5 border-r border-slate-300 text-center text-slate-500 font-bold">{idx + 1}</td>
+                              <td className="px-2 py-0.5 border-r border-slate-300 text-center font-mono"></td>
+                              <td className="px-3 py-0.5 border-r border-slate-300 font-bold text-slate-800 uppercase truncate max-w-[200px]">
+                                {hasData ? p.activity : ""}
+                              </td>
+                              <td className="px-2 py-0.5 border-r border-slate-300 text-center font-semibold text-slate-700">
+                                {hasData ? (p.category === "Regular" ? "Reg Activity" : "Ad Hoc") : ""}
+                              </td>
+                              <td className="px-2 py-0.5 border-r border-slate-300 text-center font-bold text-slate-800">
+                                {hasData ? "A60305" : ""}
+                              </td>
+                              <td className="px-3 py-0.5 border-r border-slate-300 text-right font-extrabold text-slate-800">
+                                {hasData && p.budget ? p.budget.toLocaleString("id-ID") : ""}
+                              </td>
+                              <td className="px-3 py-0.5 font-bold text-slate-600 truncate max-w-[120px]">
+                                {hasData ? `${p.count} ACTIVITY` : ""}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {/* Total Advance Row */}
+                        <tr className="bg-gray-50 border-t border-slate-300 font-bold h-[24px]">
+                          <td colSpan={5} className="px-4 py-0.5 text-right border-r border-slate-300 text-xs font-bold uppercase text-slate-700">
+                            Total Advance
+                          </td>
+                          <td className="px-3 py-0.5 text-right border-r border-slate-300 text-xs font-extrabold text-slate-900">
+                            {totalAdvance.toLocaleString("id-ID")}
+                          </td>
+                          <td className="px-3 py-0.5"></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Signatures */}
+                  <div className="grid grid-cols-2 gap-8 text-[11px] font-bold text-slate-600 mt-6 mb-8">
+                    <div className="flex flex-col items-center">
+                      <span>Claimant</span>
+                      <div className="h-14"></div>
+                      <div className="w-48 border-b border-slate-300 text-center pb-1 font-extrabold text-slate-900 uppercase">
+                        {employeeName}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <span>Approval</span>
+                      <div className="h-14"></div>
+                      <div className="w-48 border-b border-slate-300 text-center pb-1 font-extrabold text-slate-900 uppercase">
+                        DANI ADI PRASETYA
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Banker's Details */}
+                  <div className="border border-slate-300 rounded-sm grid grid-cols-12 overflow-hidden text-[11px] mt-auto">
+                    <div className="col-span-3 bg-gray-50 border-r border-slate-300 p-2.5 flex flex-col justify-center font-bold text-slate-700 leading-tight">
+                      <span>Banker 's details for</span>
+                      <span>remmiting fund</span>
+                    </div>
+                    <div className="col-span-9 divide-y divide-slate-150">
+                      <div className="grid grid-cols-12 p-1.5">
+                        <span className="col-span-3 font-semibold text-slate-500">Beneficiary</span>
+                        <span className="col-span-9 font-bold text-slate-800 uppercase">{employeeName}</span>
+                      </div>
+                      <div className="grid grid-cols-12 p-1.5">
+                        <span className="col-span-3 font-semibold text-slate-500">Amount</span>
+                        <span className="col-span-9 font-bold text-slate-800">Rp{totalAdvance.toLocaleString("id-ID")}.00</span>
+                      </div>
+                      <div className="grid grid-cols-12 p-1.5">
+                        <span className="col-span-3 font-semibold text-slate-500">Bank Name</span>
+                        <span className="col-span-9 font-bold text-slate-800">BANK CENTRAL ASIA KCP PASAR WAGE</span>
+                      </div>
+                      <div className="grid grid-cols-12 p-1.5">
+                        <span className="col-span-3 font-semibold text-slate-500">Current A/C No.</span>
+                        <span className="col-span-9 font-bold text-slate-800">Reg No. 3580482073</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Footer with page number */}
+                  <div className="absolute bottom-4 left-8 right-8 flex justify-between items-center text-[9px] text-slate-400 font-medium">
+                    <span>Dokumen ini diterbitkan secara elektronik oleh RADAR DG</span>
+                    <span>Halaman 1 dari 2</span>
+                  </div>
+
                 </div>
 
-                {/* Signatures */}
-                <div className="mt-12 pt-8 border-t border-slate-100 flex justify-between text-[10px] font-bold text-slate-600">
-                  <div className="flex flex-col items-center">
-                    <span>Diajukan Oleh,</span>
-                    <span className="text-[9px] font-medium text-slate-400 mt-0.5">Business Specialist</span>
-                    <div className="h-16"></div>
-                    <div className="w-36 border-b border-slate-300"></div>
+                {/* Fake A4 Sheet - Page 2 (Annexure / Lampiran) */}
+                <div className="bg-white w-full max-w-[210mm] shadow-md border border-slate-200/60 p-8 md:p-10 text-slate-800 flex flex-col font-sans text-xs min-h-[297mm] relative">
+                  {/* PT. ADVANTA SEEDS INDONESIA */}
+                  <div className="text-left font-bold text-[10px] tracking-tight uppercase text-slate-800 mb-2">
+                    PT. ADVANTA SEEDS INDONESIA
                   </div>
-                  <div className="flex flex-col items-center">
-                    <span>Disetujui Oleh,</span>
-                    <span className="text-[9px] font-medium text-slate-400 mt-0.5">Management / Lead</span>
-                    <div className="h-16"></div>
-                    <div className="w-36 border-b border-slate-300"></div>
+
+                  {/* Banner */}
+                  <div className="bg-gray-100 py-2.5 mb-6 flex justify-center items-center rounded border border-gray-200">
+                    <h1 className="text-lg font-black text-slate-800 tracking-wider uppercase">LAMPIRAN: DETAIL KEGIATAN PROPOSAL (ANNEXURE)</h1>
+                  </div>
+
+                  {/* Metadata Info */}
+                  <div className="flex justify-between text-[11px] mb-4 pb-2 border-b border-gray-200 font-bold text-slate-600">
+                    <span>Employee Name: <span className="text-slate-800">{employeeName}</span></span>
+                    <span>Claim No: <span className="text-slate-800 font-mono">{claimNo}</span></span>
+                  </div>
+
+                  {/* Content Table */}
+                  <div className="border border-slate-300 rounded-sm overflow-hidden mb-6">
+                    <table className="w-full text-left border-collapse text-[9px]">
+                      <thead>
+                        <tr className="bg-[#154be2] text-white font-bold">
+                          <th className="px-2 py-2 border-r border-slate-300 text-center w-8">No.</th>
+                          <th className="px-2 py-2 border-r border-slate-300 text-center">Project No</th>
+                          <th className="px-3 py-2 border-r border-slate-300 text-left">BS Name</th>
+                          <th className="px-3 py-2 border-r border-slate-300 text-left">Jenis Kegiatan</th>
+                          <th className="px-3 py-2 border-r border-slate-300 text-left">Wilayah</th>
+                          <th className="px-2 py-2 border-r border-slate-300 text-center">Farmers</th>
+                          <th className="px-2 py-2 border-r border-slate-300 text-left">Varietas</th>
+                          <th className="px-3 py-2 border-r border-slate-300 text-right">Anggaran</th>
+                          <th className="px-2 py-2 text-center">Bulan</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {proposalsList.map((p, idx) => (
+                          <tr key={p.id || idx} className="hover:bg-slate-50/40">
+                            <td className="px-2 py-1.5 border-r border-slate-300 text-center text-slate-500 font-bold">{idx + 1}</td>
+                            <td className="px-2 py-1.5 border-r border-slate-300 text-center font-mono font-bold text-[#154be2]">{p.projectNo || "-"}</td>
+                            <td className="px-3 py-1.5 border-r border-slate-300 text-slate-700 font-semibold">{p.bs || "-"}</td>
+                            <td className="px-3 py-1.5 border-r border-slate-300 text-slate-700 font-semibold">{p.activity || "-"}</td>
+                            <td className="px-3 py-1.5 border-r border-slate-300 text-slate-500 font-medium">{p.district || "-"}, {p.subDistrict || "-"}</td>
+                            <td className="px-2 py-1.5 border-r border-slate-300 text-center font-bold text-slate-800">{p.farmerReach ? Number(p.farmerReach).toLocaleString("id-ID") : "0"}</td>
+                            <td className="px-2 py-1.5 border-r border-slate-300 text-slate-600 font-medium">{p.hybrids || "-"}</td>
+                            <td className="px-3 py-1.5 border-r border-slate-300 text-right font-bold text-slate-800">Rp {p.budget ? Number(p.budget).toLocaleString("id-ID") : "0"}</td>
+                            <td className="px-2 py-1.5 text-center font-semibold text-slate-600">{p.month || "-"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Footer with page number */}
+                  <div className="absolute bottom-4 left-8 right-8 flex justify-between items-center text-[9px] text-slate-400 font-medium">
+                    <span>Dokumen ini diterbitkan secara elektronik oleh RADAR DG</span>
+                    <span>Halaman 2 dari 2</span>
                   </div>
                 </div>
 
               </div>
-            </div>
 
-            {/* Actions Footer */}
-            <div className="px-6 py-4 bg-white border-t border-slate-150 flex justify-end items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setIsPreviewPdfModalOpen(false)}
-                className="px-4 py-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-xl transition-all border border-slate-200 cursor-pointer"
-              >
-                Kembali
-              </button>
-              <button
-                type="button"
-                onClick={handleDownloadPdf}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-extrabold text-[10px] uppercase tracking-wider shadow-md hover:shadow-lg transition-all active:scale-[0.98] flex items-center gap-1.5 cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[15px]">download</span>
-                Ekspor & Unduh PDF
-              </button>
+              {/* Actions Footer */}
+              <div className="px-6 py-4 bg-white border-t border-slate-150 flex justify-end items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsPreviewPdfModalOpen(false)}
+                  className="px-4 py-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-xl transition-all border border-slate-200 cursor-pointer"
+                >
+                  Kembali
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadPdf}
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-extrabold text-[10px] uppercase tracking-wider shadow-md hover:shadow-lg transition-all active:scale-[0.98] flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[15px]">download</span>
+                  Ekspor & Unduh PDF
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };
@@ -14565,7 +15457,7 @@ const CustomActualLabel = (props: any) => {
 };
 
 const CustomChartTooltip = (props: any) => {
-  const { active, payload, label, metricType, dismissedLabel } = props;
+  const { active, payload, label, metricType, dismissedLabel, onClose } = props;
   if (dismissedLabel === label) return null;
   if (!active || !payload || !payload.length) return null;
 
@@ -14596,8 +15488,21 @@ const CustomChartTooltip = (props: any) => {
   const formattedPct = `${Math.round(pct)}%`;
 
   return (
-    <div className="bg-white/95 backdrop-blur-md p-4 rounded-2xl border border-slate-100 shadow-[0_12px_32px_rgba(21,75,226,0.12)] flex flex-col gap-2 min-w-[200px]">
-      <div className="font-bold text-[13px] text-slate-800 border-b border-slate-50 pb-1.5 mb-1">
+    <div className="bg-white/95 backdrop-blur-md p-4 rounded-2xl border border-slate-100 shadow-[0_12px_32px_rgba(21,75,226,0.12)] flex flex-col gap-2 min-w-[200px] relative pointer-events-auto">
+      {onClose && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose(label);
+          }}
+          className="absolute top-2.5 right-2.5 size-5 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer border-0 p-0 text-[10px] font-bold transition-colors"
+          title="Tutup"
+        >
+          ✕
+        </button>
+      )}
+      <div className="font-bold text-[13px] text-slate-800 border-b border-slate-50 pb-1.5 mb-1 pr-5">
         {displayName}
       </div>
       <div className="flex items-center justify-between gap-4 text-xs">
@@ -14924,6 +15829,7 @@ export default function App() {
     | "activity"
     | "nominal"
     | "reach"
+    | "overview"
   >("activity");
 
   // Filter states for the lower part ("yang dibawah")
