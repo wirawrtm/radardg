@@ -9493,15 +9493,12 @@ const Dashboard = ({
 
             {/* Metrik Selector Dropdown Picklist */}
             <div className="flex items-center gap-2">
-              <div className="relative bg-gradient-to-r from-[#154be2] to-[#0f3db5] px-5 py-2.5 rounded-2xl border border-[#154be2]/20 shadow-[0_8px_20px_rgba(21,75,226,0.3)] hover:shadow-[0_12px_28px_rgba(21,75,226,0.4)] transition-all duration-300 flex items-center gap-3 select-none hover:scale-[1.02]">
-                <span className="text-[10px] font-black text-blue-200 uppercase tracking-wider">
-                  Metric:
-                </span>
+              <div className="relative bg-gradient-to-r from-primary to-cyan-400 px-6 py-3.5 rounded-2xl border border-white/20 shadow-[0_8px_20px_rgba(21,75,226,0.25)] hover:shadow-[0_12px_28px_rgba(21,75,226,0.35)] transition-all duration-300 flex items-center select-none hover:scale-[1.02]">
                 <div className="relative flex items-center">
                   <select
                     value={overviewMetricFilter}
                     onChange={(e: any) => setOverviewMetricFilter(e.target.value as any)}
-                    className="bg-transparent text-sm font-black text-white focus:outline-none focus:ring-0 appearance-none cursor-pointer pr-7 pl-1 py-0.5 leading-tight"
+                    className="bg-transparent text-sm font-black text-white focus:outline-none focus:ring-0 appearance-none cursor-pointer pr-7 pl-1 py-1 leading-tight"
                   >
                     <option value="overview" className="text-slate-900 bg-white font-semibold">Overview</option>
                     <option value="activity" className="text-slate-900 bg-white font-semibold">Activity</option>
@@ -9831,7 +9828,7 @@ const Dashboard = ({
           {/* Charts Grid Row 1 */}
           <div className="grid grid-cols-1 lg:grid-cols-11 gap-6 mb-6">
             {/* Chart 1: Sales (POG) & Stock per Area / Dimension */}
-            <div className="lg:col-span-7 bg-white p-4 lg:p-5 rounded-[48px] shadow-[0_12px_32px_rgba(21,75,226,0.18)] border border-[#154be2]/8 flex flex-col gap-0 lg:h-[660px] h-fit">
+            <div className="order-2 lg:order-1 lg:col-span-8 bg-white p-4 lg:p-5 rounded-[48px] shadow-[0_12px_32px_rgba(21,75,226,0.18)] border border-[#154be2]/8 flex flex-col gap-0 lg:h-[600px] h-fit">
               <div className="flex flex-col gap-1 mb-1 pb-1 border-b border-[#f0effc]/60">
                 <div className="flex items-start justify-between">
                   <div>
@@ -9869,115 +9866,58 @@ const Dashboard = ({
 
                 <div className="flex flex-wrap items-center justify-between gap-3 w-full">
                   {/* Selector Filter 2: Dimensi Grouping */}
-                  {showBudgetEffectivenessFilters && (
-                    <div className="flex flex-wrap items-center gap-2 animate-fadeIn">
-                      <div className="flex items-center gap-2 bg-[#fbfaff] px-2.5 py-1 rounded-xl border border-[#e2e8f0]/80">
-                        <span className="text-[9.5px] font-bold text-[#8E94B7] uppercase tracking-wider">
-                          Dimensi:
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-2 bg-[#fbfaff] px-2.5 py-1 rounded-xl border border-[#e2e8f0]/80">
+                      <span className="text-[9.5px] font-bold text-[#8E94B7] uppercase tracking-wider">
+                        Dimensi:
+                      </span>
+                      <div className="relative">
+                        <select
+                          value={overviewGroupDimension}
+                          onChange={(e: any) =>
+                            setOverviewGroupDimension(e.target.value as any)
+                          }
+                          className="bg-transparent text-[10.5px] font-black text-[#154be2] focus:outline-none focus:ring-0 appearance-none cursor-pointer pr-6 py-0.5"
+                        >
+                          <option value="area">Area</option>
+                          <option value="province">Province</option>
+                          <option value="sales_agronomist">Sales Agronomist</option>
+                          <option value="hybrid">Hybrids</option>
+                          <option value="activity">Activity</option>
+                        </select>
+                        <span className="material-symbols-outlined absolute right-0 top-1/2 -translate-y-1/2 text-[14px] text-primary pointer-events-none">
+                          expand_more
                         </span>
-                        <div className="relative">
-                          <select
-                            value={overviewGroupDimension}
-                            onChange={(e: any) =>
-                              setOverviewGroupDimension(e.target.value as any)
-                            }
-                            className="bg-transparent text-[10.5px] font-black text-[#154be2] focus:outline-none focus:ring-0 appearance-none cursor-pointer pr-6 py-0.5"
-                          >
-                            <option value="area">Area</option>
-                            <option value="province">Province</option>
-                            <option value="sales_agronomist">Sales Agronomist</option>
-                            <option value="hybrid">Hybrids</option>
-                            <option value="activity">Activity</option>
-                          </select>
-                          <span className="material-symbols-outlined absolute right-0 top-1/2 -translate-y-1/2 text-[14px] text-primary pointer-events-none">
-                            expand_more
-                          </span>
-                        </div>
                       </div>
-
-                      {/* Selector Filter: Sub Grouping */}
-                      <div className="flex items-center gap-2 bg-[#fbfaff] px-2.5 py-1 rounded-xl border border-[#e2e8f0]/80">
-                        <span className="text-[9.5px] font-bold text-[#8E94B7] uppercase tracking-wider">
-                          Sub:
-                        </span>
-                        <div className="relative">
-                          <select
-                            value={subGroupDimension}
-                            onChange={(e: any) =>
-                              setSubGroupDimension(e.target.value as any)
-                            }
-                            className="bg-transparent text-[10.5px] font-black text-[#154be2] focus:outline-none focus:ring-0 appearance-none cursor-pointer pr-6 py-0.5"
-                          >
-                            <option value="area">Area</option>
-                            <option value="province">Province</option>
-                            <option value="sales_agronomist">Sales Agronomist</option>
-                            <option value="hybrid">Hybrids</option>
-                            <option value="activity">Activity</option>
-                          </select>
-                          <span className="material-symbols-outlined absolute right-0 top-1/2 -translate-y-1/2 text-[14px] text-primary pointer-events-none">
-                            expand_more
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Selector Filter: Sorting */}
-                      <div className="flex items-center gap-2 bg-[#fbfaff] px-2.5 py-1 rounded-xl border border-[#e2e8f0]/80">
-                        <span className="text-[9.5px] font-bold text-[#8E94B7] uppercase tracking-wider">
-                          Sort:
-                        </span>
-                        <div className="relative">
-                          <select
-                            value={overviewSortField}
-                            onChange={(e: any) =>
-                              setOverviewSortField(e.target.value as any)
-                            }
-                            className="bg-transparent text-[10.5px] font-black text-[#154be2] focus:outline-none focus:ring-0 appearance-none cursor-pointer pr-6 py-0.5"
-                          >
-                            <option value="actual">Actual</option>
-                            <option value="budget">Budget</option>
-                            <option value="percentage">Percentage</option>
-                            <option value="gap">Gap</option>
-                          </select>
-                          <span className="material-symbols-outlined absolute right-0 top-1/2 -translate-y-1/2 text-[14px] text-primary pointer-events-none">
-                            expand_more
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Sort Order Icon Toggle Button */}
-                      <button
-                        type="button"
-                        onClick={() => setOverviewSortOrder(prev => prev === "desc" ? "asc" : "desc")}
-                        className="p-1 bg-[#fbfaff] hover:bg-[#154be2]/10 active:bg-[#154be2]/20 border border-[#e2e8f0]/80 rounded-xl flex items-center justify-center transition-all cursor-pointer text-[#154be2] shrink-0"
-                        title={overviewSortOrder === "desc" ? "Urutkan Terendah (asc)" : "Urutkan Tertinggi (desc)"}
-                      >
-                        <span className="material-symbols-outlined text-[16px] font-bold">
-                          {overviewSortOrder === "desc" ? "arrow_downward" : "arrow_upward"}
-                        </span>
-                      </button>
                     </div>
-                  )}
+
+                    {/* Selector Filter: Sub Grouping */}
+                    <div className="flex items-center gap-2 bg-[#fbfaff] px-2.5 py-1 rounded-xl border border-[#e2e8f0]/80">
+                      <span className="text-[9.5px] font-bold text-[#8E94B7] uppercase tracking-wider">
+                        Sub:
+                      </span>
+                      <div className="relative">
+                        <select
+                          value={subGroupDimension}
+                          onChange={(e: any) =>
+                            setSubGroupDimension(e.target.value as any)
+                          }
+                          className="bg-transparent text-[10.5px] font-black text-[#154be2] focus:outline-none focus:ring-0 appearance-none cursor-pointer pr-6 py-0.5"
+                        >
+                          <option value="area">Area</option>
+                          <option value="province">Province</option>
+                          <option value="sales_agronomist">Sales Agronomist</option>
+                          <option value="hybrid">Hybrids</option>
+                          <option value="activity">Activity</option>
+                        </select>
+                        <span className="material-symbols-outlined absolute right-0 top-1/2 -translate-y-1/2 text-[14px] text-primary pointer-events-none">
+                          expand_more
+                        </span>
+                      </div>
+                    </div>
+                  </div>
 
                   <div className="flex items-center gap-3 shrink-0 ml-auto select-none">
-                    {/* Toggle Filters Button */}
-                    <button
-                      type="button"
-                      onClick={() => setShowBudgetEffectivenessFilters(prev => !prev)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-black transition-all cursor-pointer ${
-                        showBudgetEffectivenessFilters
-                          ? "bg-[#154be2]/10 text-[#154be2] border-[#154be2]/20 hover:bg-[#154be2]/15"
-                          : "bg-slate-50 text-[#5c648e] border-[#e2e8f0]/80 hover:bg-slate-100"
-                      }`}
-                      title={showBudgetEffectivenessFilters ? "Sembunyikan Filter" : "Tampilkan Filter"}
-                    >
-                      <span className="material-symbols-outlined text-[16px]">
-                        {showBudgetEffectivenessFilters ? "visibility_off" : "tune"}
-                      </span>
-                      <span>
-                        {showBudgetEffectivenessFilters ? "Hide Filters" : "Show Filters"}
-                      </span>
-                    </button>
-
                     {/* Legend aligned side-by-side */}
                     <div className="flex items-center gap-4 bg-[#fbfaff] px-3.5 py-1.5 rounded-xl border border-[#e2e8f0]/40">
                       <button
@@ -10459,11 +10399,11 @@ const Dashboard = ({
             </div>
 
             {/* KPI Cards Stack (Replacing Segmentasi Partner) */}
-            <div className="lg:col-span-4 flex flex-col h-full min-h-0">
-              <div className={`flex flex-col pl-4 pr-5 lg:pl-5 lg:pr-6.5 py-4.5 ${
+            <div className="order-1 lg:order-2 lg:col-span-3 flex flex-col h-full min-h-0">
+              <div className={`flex flex-col px-3.5 lg:pl-4.5 lg:pr-3 py-3.5 pb-8 ${
                 overviewMetricFilter === "overview"
-                  ? "lg:h-[660px] lg:justify-between gap-4"
-                  : "overflow-y-auto max-h-[460px] lg:max-h-[660px] lg:h-[660px] gap-3.5 scrollbar-thin"
+                  ? "lg:h-[600px] lg:justify-between gap-4"
+                  : "overflow-y-auto max-h-[460px] lg:max-h-[600px] lg:h-[600px] gap-3.5 scrollbar-thin"
               }`}>
                 {overviewMetricFilter === "overview" ? (
                   (() => {
@@ -10544,10 +10484,10 @@ const Dashboard = ({
                       let shadowStyle = "";
                       
                       if (card.key === "activity") {
-                        cardStyle = "bg-gradient-to-r from-violet-600 to-indigo-500 text-white border border-violet-400/30";
+                        cardStyle = "bg-gradient-to-r from-[#154be2] to-[#3b82f6] text-white border border-blue-400/30";
                         shadowStyle = isSelected 
-                          ? "shadow-[0_20px_40px_-4px_rgba(109,40,217,0.55)] scale-[1.025] z-10 opacity-100 ring-2 ring-violet-400/30" 
-                          : "shadow-none opacity-[0.76] hover:opacity-[0.92] hover:scale-[1.01] hover:shadow-[0_10px_24px_rgba(109,40,217,0.25)]";
+                          ? "shadow-[0_20px_40px_-4px_rgba(21,75,226,0.55)] scale-[1.025] z-10 opacity-100 ring-2 ring-blue-400/30" 
+                          : "shadow-none opacity-[0.76] hover:opacity-[0.92] hover:scale-[1.01] hover:shadow-[0_10px_24px_rgba(21,75,226,0.25)]";
                       } else if (card.key === "nominal") {
                         cardStyle = "bg-gradient-to-r from-amber-500 to-orange-500 text-white border border-amber-400/30";
                         shadowStyle = isSelected 
@@ -10564,7 +10504,7 @@ const Dashboard = ({
                         <button
                           key={card.key}
                           onClick={() => setOverviewSubFilter(card.key as any)}
-                          className={`rounded-[32px] lg:w-[94%] lg:mx-auto flex flex-row items-center justify-between relative overflow-hidden group transition-all duration-300 w-full text-left cursor-pointer border-0 p-5 lg:flex-1 lg:min-h-0 min-h-[110px] ${cardStyle} ${shadowStyle}`}
+                          className={`rounded-[32px] flex flex-row items-center justify-between relative overflow-hidden group transition-all duration-300 w-full text-left cursor-pointer border-0 py-6 px-5 lg:flex-1 lg:min-h-0 min-h-[110px] ${cardStyle} ${shadowStyle}`}
                         >
                           <div className="flex flex-col justify-center z-10 min-w-0 flex-1 pr-2">
                             <div className="mb-0.5">
@@ -10575,17 +10515,17 @@ const Dashboard = ({
                             <h4 className="text-[15px] font-black leading-tight truncate text-white">
                               {card.subtitle}
                             </h4>
-                            <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-                              <span className="font-sans font-black text-[13px] text-white">
-                                {card.actualStr}
-                              </span>
-                              <span className="text-white/40">/</span>
-                              <span className="font-sans font-extrabold text-[12.5px] text-white/80">
-                                {card.budgetStr}
-                              </span>
-                              <span className="ml-1 px-1.5 py-0.5 rounded text-[11px] font-black bg-white/20 text-white border border-white/10">
-                                {displayGapStr}
-                              </span>
+                            <div className="mt-2 flex flex-col items-start gap-1">
+                              <div className="flex items-center gap-1 font-sans font-black text-[13px] text-white">
+                                <span>{card.actualStr}</span>
+                                <span className="text-white/40">/</span>
+                                <span className="font-sans font-extrabold text-[12.5px] text-white/80">{card.budgetStr}</span>
+                              </div>
+                              <div className="mt-1">
+                                <span className="px-1.5 py-0.5 rounded text-[11px] font-black bg-white/20 text-white border border-white/10">
+                                  {displayGapStr}
+                                </span>
+                              </div>
                             </div>
                           </div>
 
@@ -10649,10 +10589,10 @@ const Dashboard = ({
                             setActiveActivityFilter((prev) => (prev === act.name ? null : act.name));
                           }
                         }}
-                        className={`rounded-[32px] lg:w-[94%] lg:mx-auto flex flex-row items-center justify-between relative overflow-hidden group transition-all duration-300 w-full text-left cursor-pointer border-0 ${
+                        className={`rounded-[32px] flex flex-row items-center justify-between relative overflow-hidden group transition-all duration-300 w-full text-left cursor-pointer border-0 ${
                           act.name === "TOTAL"
-                            ? "min-h-[116px] py-5 px-5 lg:py-6 lg:px-6"
-                            : "min-h-[96px] py-4 px-4 lg:py-5 lg:px-4.5"
+                            ? "min-h-[130px] py-7 px-5 lg:py-7 lg:px-6"
+                            : "min-h-[110px] py-6 px-4 lg:py-6.5 lg:px-4.5"
                         } ${
                           isSelected
                             ? "bg-gradient-to-r from-[#154be2] to-cyan-500 text-white shadow-[0_12px_32px_rgba(21,75,226,0.25)] scale-[1.02]"
@@ -10661,24 +10601,14 @@ const Dashboard = ({
                       >
                         <div className="flex flex-col justify-center z-10 min-w-0 flex-1 pr-2">
                           <div>
-                            {/* Abbreviation above full name */}
-                            <div className="mb-0.5">
-                              <span className={`${act.name === "TOTAL" ? "text-[10px] px-2 py-0.5" : "text-[8px] px-1.5 py-0.2"} font-black rounded-md uppercase tracking-wider ${
-                                isSelected
-                                  ? "bg-white/20 text-white border border-white/20"
-                                  : "bg-[#154be2]/10 text-[#154be2]"
-                              }`}>
-                                {act.name}
-                              </span>
-                            </div>
-                            <h4 className={`${act.name === "TOTAL" ? "text-[16px] lg:text-[17px]" : "text-[12px] lg:text-[12.5px]"} font-black leading-tight truncate max-w-[180px] lg:max-w-[220px] ${
+                            <h4 className={`${act.name === "TOTAL" ? "text-[16px] lg:text-[17px]" : "text-[12.5px] lg:text-[13px]"} font-black leading-tight text-[#181a2c] ${
                               isSelected ? "text-white" : "text-[#181a2c]"
                             }`} title={act.fullName}>
                               {act.fullName}
                             </h4>
                           </div>
-                          <div className="mt-1.5">
-                            <div className={`font-sans font-extrabold ${act.name === "TOTAL" ? "text-[12.5px] lg:text-[13px]" : "text-[12.5px] lg:text-[13.5px]"} ${isSelected ? "text-white" : ""} flex items-center gap-1.5 flex-wrap`}>
+                          <div className="mt-2 flex flex-col items-start gap-1">
+                            <div className={`font-sans font-extrabold ${act.name === "TOTAL" ? "text-[12.5px] lg:text-[13px]" : "text-[12px] lg:text-[12.5px]"} ${isSelected ? "text-white" : ""} flex items-center gap-1`}>
                               <span className={isSelected ? "text-white font-black" : "text-[#06b6d4]"}>
                                 {act.actualStr}
                               </span>
@@ -10688,13 +10618,11 @@ const Dashboard = ({
                               <span className={isSelected ? "text-white/85" : "text-[#154be2]"}>
                                 {act.budgetStr}
                               </span>
-                              <span className={`ml-1.5 px-2 py-0.5 rounded font-black ${
-                                act.name === "TOTAL"
-                                  ? "text-[12px] lg:text-[12.5px]"
-                                  : "text-[12.5px] lg:text-[13.5px]"
-                              } ${
+                            </div>
+                            <div className="mt-1">
+                              <span className={`px-2 py-0.5 rounded font-black text-[11px] ${
                                 isSelected
-                                  ? "bg-white/20 text-white"
+                                  ? "bg-white/20 text-white border border-white/10"
                                   : gap >= 0
                                     ? "bg-emerald-50 text-emerald-700 border border-emerald-100/50"
                                     : "bg-rose-50 text-rose-700 border border-rose-100/50"
