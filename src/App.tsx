@@ -7,7 +7,6 @@ import React, {
 } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { AdvantaLogo } from "./AdvantaLogo";
-import jagoanLogo from "./assets/jagoan.png";
 import { UserIcon } from "./UserIcon";
 import { User } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -10969,7 +10968,7 @@ const Dashboard = ({
                             <div className="hidden lg:grid w-full lg:grid-cols-[auto_1fr_1fr_1fr] gap-2 lg:gap-3 items-stretch">
                               <div className="flex items-center justify-end pr-0 w-[130px] xl:w-[160px]">
                                 <img
-                                  src={jagoanLogo}
+                                  src="https://lh3.googleusercontent.com/d/1A0MkFXGsBDmXt67z5uED_jpVQ2QdXUdl=w1000"
                                   className="w-full h-auto max-h-[160px] xl:max-h-[180px] object-contain object-right drop-shadow-md"
                                   alt="Jagoan Advanta"
                                 />
@@ -10981,7 +10980,7 @@ const Dashboard = ({
                               <div className="w-full flex flex-row gap-1.5 sm:gap-2 items-stretch">
                                 <div className="flex items-center justify-end shrink-0 w-[85px] sm:w-[110px] md:w-[140px]">
                                   <img
-                                    src={jagoanLogo}
+                                    src="https://lh3.googleusercontent.com/d/1A0MkFXGsBDmXt67z5uED_jpVQ2QdXUdl=w1000"
                                     className="w-full h-auto max-h-[120px] sm:max-h-[140px] md:max-h-[160px] object-contain object-right drop-shadow-md"
                                     alt="Jagoan Advanta"
                                   />
