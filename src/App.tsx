@@ -10024,6 +10024,16 @@ const Dashboard = ({
 
                       const activeIndex = clickedPieIndex !== null ? clickedPieIndex : largestSubIndex;
 
+                      const windowWidth = typeof window !== "undefined" ? window.innerWidth : 1200;
+                      const isMobile = windowWidth < 640;
+                      const isTablet = windowWidth >= 640 && windowWidth < 1024;
+                      const currentMargin = isMobile
+                        ? { top: 12, right: 30, left: 30, bottom: 12 }
+                        : isTablet
+                          ? { top: 18, right: 45, left: 45, bottom: 18 }
+                          : { top: 25, right: 65, left: 65, bottom: 25 };
+                      const currentOuterRadius = isMobile ? 48 : isTablet ? 72 : 105;
+
                       return (
                         <div className="flex flex-col h-full min-h-[220px] lg:min-h-[260px] gap-1 relative">
                           <div className="flex flex-row items-start justify-between gap-2">
@@ -10064,12 +10074,12 @@ const Dashboard = ({
 
                           <div className="w-full h-[180px] sm:h-[210px] lg:h-[290px] relative">
                             <ResponsiveContainer width="100%" height="100%">
-                              <PieChart margin={{ top: 25, right: 65, left: 65, bottom: 25 }}>
+                              <PieChart margin={currentMargin}>
                                 <Pie
                                   data={subData}
                                   cx="50%"
                                   cy="50%"
-                                  outerRadius={105}
+                                  outerRadius={currentOuterRadius}
                                   dataKey={metricKey}
                                   nameKey="name"
                                   activeIndex={activeIndex}
@@ -10090,8 +10100,9 @@ const Dashboard = ({
                                     } = props;
                                     const sin = Math.sin(-midAngle * RADIAN);
                                     const cos = Math.cos(-midAngle * RADIAN);
-                                    const mx = cx + 14 * cos;
-                                    const my = cy + 14 * sin;
+                                    const shiftAmount = isMobile ? 6 : isTablet ? 10 : 14;
+                                    const mx = cx + shiftAmount * cos;
+                                    const my = cy + shiftAmount * sin;
 
                                     return (
                                       <g>
@@ -10099,7 +10110,7 @@ const Dashboard = ({
                                           cx={mx}
                                           cy={my}
                                           innerRadius={innerRadius}
-                                          outerRadius={outerRadius + 8}
+                                          outerRadius={outerRadius + (isMobile ? 4 : isTablet ? 6 : 8)}
                                           startAngle={startAngle}
                                           endAngle={endAngle}
                                           fill={fill}
@@ -10126,8 +10137,9 @@ const Dashboard = ({
                                       const RADIAN = Math.PI / 180;
                                       const sin = Math.sin(-midAngle * RADIAN);
                                       const cos = Math.cos(-midAngle * RADIAN);
-                                      lx += 15 * cos;
-                                      ly += 15 * sin;
+                                      const labelShift = isMobile ? 6 : isTablet ? 10 : 15;
+                                      lx += labelShift * cos;
+                                      ly += labelShift * sin;
                                     }
                                     
                                     // Split name if too long to make it wrap
@@ -10147,8 +10159,8 @@ const Dashboard = ({
                                         dominantBaseline="central"
                                         className={
                                           isActive
-                                            ? "text-[12px] sm:text-[13px] lg:text-[14px] font-black drop-shadow-sm transition-all duration-300"
-                                            : "text-[9px] sm:text-[10px] lg:text-[11px] font-extrabold"
+                                            ? "text-[11px] sm:text-[13px] lg:text-[14px] font-black drop-shadow-sm transition-all duration-300"
+                                            : "text-[8px] sm:text-[10px] lg:text-[11px] font-extrabold"
                                         }
                                       >
                                         {nameLines.map((line, i) => (
@@ -10163,32 +10175,32 @@ const Dashboard = ({
                                     );
                                   }}
                                 >
-                                  {subData.map((entry: any, index: number) => {
-                                    const colors = ["#154be2", "#3b82f6", "#06b6d4", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6"];
-                                    const color = colors[index % colors.length];
-                                    return <Cell key={`sub-pie-cell-${index}`} fill={color} />;
-                                  })}
-                                </Pie>
-                                {clickedPieIndex === null && (
-                                  <Tooltip
-                                    formatter={(value: any, name: any) => {
-                                      let formattedValue = value;
-                                      if (chartMetric === "nominal") {
-                                        formattedValue = `Rp ${(value / 1000000).toFixed(0)} Jt`;
-                                      } else {
-                                        formattedValue = Number(value).toLocaleString("id-ID");
-                                      }
-                                      return [formattedValue, name];
-                                    }}
-                                    contentStyle={{ borderRadius: "16px", border: "1px solid #e2e8f0", boxShadow: "0 10px 25px rgba(0,0,0,0.05)", fontWeight: "bold" }}
-                                  />
-                                )}
-                              </PieChart>
-                            </ResponsiveContainer>
-                          </div>
-                        </div>
-                      );
-                    })()}
+                              {subData.map((entry: any, index: number) => {
+                                const colors = ["#154be2", "#3b82f6", "#06b6d4", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6"];
+                                const color = colors[index % colors.length];
+                                return <Cell key={`sub-pie-cell-${index}`} fill={color} />;
+                              })}
+                            </Pie>
+                            {clickedPieIndex === null && (
+                              <Tooltip
+                                formatter={(value: any, name: any) => {
+                                  let formattedValue = value;
+                                  if (chartMetric === "nominal") {
+                                    formattedValue = `Rp ${(value / 1000000).toFixed(0)} Jt`;
+                                  } else {
+                                    formattedValue = Number(value).toLocaleString("id-ID");
+                                  }
+                                  return [formattedValue, name];
+                                }}
+                                contentStyle={{ borderRadius: "16px", border: "1px solid #e2e8f0", boxShadow: "0 10px 25px rgba(0,0,0,0.05)", fontWeight: "bold" }}
+                              />
+                            )}
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  );
+                })()}
                   </div>
                 </>
               ) : (
@@ -10927,7 +10939,7 @@ const Dashboard = ({
                             <button
                               key={card.key}
                               onClick={() => setOverviewSubFilter(card.key as any)}
-                              className={`rounded-[32px] flex flex-row items-center justify-between relative overflow-hidden group transition-all duration-300 w-full text-left cursor-pointer border-0 py-4 xs:py-5 sm:py-6 pl-4 xs:pl-5 pr-[90px] xs:pr-[105px] sm:pr-[115px] md:pr-[125px] ${activeTab === "overview_v2" ? "col-span-1" : "lg:flex-1 lg:min-h-0"} min-h-[110px] ${cardStyle} ${shadowStyle}`}
+                              className={`rounded-[32px] flex flex-row items-center justify-between relative overflow-hidden group transition-all duration-300 w-full text-left cursor-pointer border-0 py-4 xs:py-5 sm:py-6 pl-3.5 xs:pl-4 sm:pl-5 pr-[60px] xs:pr-[75px] sm:pr-[110px] lg:pr-[125px] ${activeTab === "overview_v2" ? "col-span-1 h-full" : "lg:flex-1 lg:min-h-0"} min-h-[100px] xs:min-h-[110px] ${cardStyle} ${shadowStyle}`}
                             >
                               <div className="flex flex-col justify-center z-10 min-w-0 flex-1 pr-1">
                                 {activeTab !== "overview_v2" && (
@@ -10937,17 +10949,17 @@ const Dashboard = ({
                                     </span>
                                   </div>
                                 )}
-                                <h4 className="text-[12px] xs:text-[13.5px] sm:text-[14.5px] font-black leading-tight sm:leading-snug text-white break-words whitespace-normal">
+                                <h4 className="text-[10px] xs:text-[12px] sm:text-[14.5px] font-black leading-tight sm:leading-snug text-white break-words whitespace-normal">
                                   {card.subtitle}
                                 </h4>
                                 <div className="mt-1.5 xs:mt-2 flex flex-col items-start gap-0.5 xs:gap-1">
-                                  <div className="flex flex-wrap items-center gap-0.5 xs:gap-1 font-sans font-black text-[11px] xs:text-[12px] sm:text-[13px] text-white">
+                                  <div className="flex flex-wrap items-center gap-0.5 xs:gap-1 font-sans font-black text-[9px] xs:text-[11px] sm:text-[13px] text-white">
                                     <span>{card.actualStr}</span>
                                     <span className="text-white/40">/</span>
-                                    <span className="font-sans font-extrabold text-[10.5px] xs:text-[11.5px] sm:text-[12.5px] text-white/80">{card.budgetStr}</span>
+                                    <span className="font-sans font-extrabold text-[8.5px] xs:text-[10.5px] sm:text-[12.5px] text-white/80">{card.budgetStr}</span>
                                   </div>
                                   <div className="mt-0.5 xs:mt-1">
-                                    <span className="px-1 xs:px-1.5 py-0.5 rounded text-[9.5px] xs:text-[10px] sm:text-[11px] font-black bg-white/20 text-white border border-white/10">
+                                    <span className="px-1 xs:px-1.5 py-0.5 rounded text-[8px] xs:text-[9.5px] sm:text-[11px] font-black bg-white/20 text-white border border-white/10">
                                       {displayGapStr}
                                     </span>
                                   </div>
@@ -10977,23 +10989,25 @@ const Dashboard = ({
                             </div>
                             {/* Mobile / Tablet Layout */}
                             <div className="w-full flex flex-col gap-3 sm:gap-4 lg:hidden">
-                              <div className="w-full flex flex-row gap-1.5 sm:gap-2 items-stretch">
-                                <div className="flex items-center justify-end shrink-0 w-[85px] sm:w-[110px] md:w-[140px]">
+                              {/* Row 1: Icon Jagoan + Total Kegiatan Card */}
+                              <div className="w-full flex flex-row gap-2 sm:gap-3 items-stretch">
+                                <div className="flex items-center justify-center shrink-0 bg-white border border-slate-100 shadow-sm rounded-[32px] p-2 w-[85px] xs:w-[100px] sm:w-[120px]">
                                   <img
                                     src="https://lh3.googleusercontent.com/d/1A0MkFXGsBDmXt67z5uED_jpVQ2QdXUdl=w1000"
-                                    className="w-full h-auto max-h-[120px] sm:max-h-[140px] md:max-h-[160px] object-contain object-right drop-shadow-md"
+                                    className="w-full h-auto max-h-[85px] xs:max-h-[100px] object-contain drop-shadow-md"
                                     alt="Jagoan Advanta"
                                   />
                                 </div>
-                                <div className="flex-1 min-w-0 flex flex-col flex-1 min-w-0 flex flex-col">
+                                <div className="flex-1 min-w-0">
                                   {renderedCards[0]}
                                 </div>
                               </div>
-                              <div className="w-full flex flex-row gap-3 sm:gap-4 items-stretch">
-                                <div className="flex-1 min-w-0 flex flex-col flex-1 min-w-0 flex flex-col">
+                              {/* Row 2: Total Anggaran + Farmer Reach Cards */}
+                              <div className="w-full grid grid-cols-2 gap-2 sm:gap-3 items-stretch">
+                                <div className="min-w-0">
                                   {renderedCards[1]}
                                 </div>
-                                <div className="flex-1 min-w-0 flex flex-col flex-1 min-w-0 flex flex-col">
+                                <div className="min-w-0">
                                   {renderedCards[2]}
                                 </div>
                               </div>
@@ -16128,6 +16142,14 @@ const CustomYAxisTick = (props: any) => {
 };
 
 export default function App() {
+  const [windowWidth, setWindowWidth] = useState(() => typeof window !== "undefined" ? window.innerWidth : 1200);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   const [userData, setUserData] = useState(() => {
     try {
       const saved = localStorage.getItem("radar_user_session");
@@ -17046,7 +17068,7 @@ export function CurvedProgressIndicator({ pct, index = 0 }: CurvedProgressIndica
   }, [pct]);
 
   return (
-    <div className="absolute right-0 top-0 bottom-0 w-[90px] xs:w-[105px] sm:w-[115px] md:w-[130px] h-full shrink-0 z-10 overflow-hidden rounded-r-[32px] select-none pointer-events-none">
+    <div className="absolute right-0 top-0 bottom-0 w-[55px] xs:w-[75px] sm:w-[110px] lg:w-[130px] h-full shrink-0 z-10 overflow-hidden rounded-r-[32px] select-none pointer-events-none">
       <svg className="size-full" viewBox="0 0 130 110" preserveAspectRatio="none">
         {/* Right side shaded region */}
         <path
@@ -17106,11 +17128,11 @@ export function CurvedProgressIndicator({ pct, index = 0 }: CurvedProgressIndica
         </g>
       </svg>
       {/* HTML-rendered Percentage Text to avoid any SVG stretching/distortion */}
-      <div className="absolute left-[68%] -translate-x-1/2 top-1/2 -translate-y-1/2 flex items-baseline text-white">
-        <span className="font-sans font-black text-[17px] xs:text-[20px] sm:text-[22px] md:text-[23px] tracking-tight leading-none">
+      <div className="absolute left-[54%] xs:left-[60%] sm:left-[68%] -translate-x-1/2 top-1/2 -translate-y-1/2 flex items-baseline text-white">
+        <span className="font-sans font-black text-[11px] xs:text-[15px] sm:text-[22px] md:text-[23px] tracking-tight leading-none">
           {Math.round(animatedPct)}
         </span>
-        <span className="font-sans font-black text-[10px] xs:text-[12px] sm:text-[13px] md:text-[14px] leading-none ml-px opacity-90">
+        <span className="font-sans font-black text-[7px] xs:text-[9px] sm:text-[13px] md:text-[14px] leading-none ml-px opacity-90">
           %
         </span>
       </div>
