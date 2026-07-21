@@ -24,6 +24,7 @@ import {
   PieChart,
   Pie,
   Cell,
+  Sector,
   AreaChart,
   Area,
   LineChart,
@@ -1715,6 +1716,19 @@ const Dashboard = ({
   const [dismissedTooltipLabel, setDismissedTooltipLabel] = useState<string | null>(null);
   const [activeSubBarKey, setActiveSubBarKey] = useState<string | null>(null);
   const [dismissedSubTooltipLabel, setDismissedSubTooltipLabel] = useState<string | null>(null);
+
+  const dismissedTooltipLabelRef = useRef<string | null>(null);
+  const dismissedSubTooltipLabelRef = useRef<string | null>(null);
+
+  const changeDismissedTooltipLabel = (val: string | null) => {
+    dismissedTooltipLabelRef.current = val;
+    setDismissedTooltipLabel(val);
+  };
+
+  const changeDismissedSubTooltipLabel = (val: string | null) => {
+    dismissedSubTooltipLabelRef.current = val;
+    setDismissedSubTooltipLabel(val);
+  };
   const [showBudgetBar, setShowBudgetBar] = useState<boolean>(true);
   const [showActualBar, setShowActualBar] = useState<boolean>(true);
   const [showBudgetEffectivenessFilters, setShowBudgetEffectivenessFilters] = useState<boolean>(true);
@@ -2272,6 +2286,9 @@ const Dashboard = ({
   const [overviewGroupDimension, setOverviewGroupDimension] = useState<
     "area" | "province" | "sales_agronomist" | "hybrid" | "activity" | "business_solution" | "material"
   >("area");
+
+  // Clicked pie slice index for the dynamic interactive pie chart
+  const [clickedPieIndex, setClickedPieIndex] = useState<number | null>(null);
 
   // Dimension filter for Sub-performance overview chart
   const [subGroupDimension, setSubGroupDimension] = useState<
@@ -5566,7 +5583,7 @@ const Dashboard = ({
     });
   }, [pogDataOverviewFiltered, overviewMetricFilter, filterBelowType]);
 
-  const chartMetric = overviewMetricFilter === "overview" ? overviewSubFilter : overviewMetricFilter;
+  const chartMetric = (overviewMetricFilter === "overview" || overviewMetricFilter === "monitoring") ? overviewSubFilter : overviewMetricFilter;
 
   const overviewTotals = useMemo(() => {
     const REGULAR_LIST = ["FFD", "FM", "ODP", "SFT", "BC", "PT"];
@@ -5968,7 +5985,7 @@ const Dashboard = ({
         }
       });
 
-      const activeMetric = overviewMetricFilter === "overview" ? overviewSubFilter : overviewMetricFilter;
+      const activeMetric = (overviewMetricFilter === "overview" || overviewMetricFilter === "monitoring") ? overviewSubFilter : overviewMetricFilter;
 
       const getMetricsForSort = (item: any) => {
         let actual = 0;
@@ -6194,6 +6211,8 @@ const Dashboard = ({
       categoryChartData,
       cropsChartData,
       partnerChartData,
+      hybridPieData: buildChartData("hybrid"),
+      territoryPieData: buildChartData("area"),
     };
   }, [
     kiosks,
@@ -9400,7 +9419,7 @@ const Dashboard = ({
 
   return (
     <div className="w-full max-w-2xl mx-auto lg:max-w-5xl xl:max-w-6xl px-5 pb-8 relative">
-      <div className="flex items-stretch gap-2 mb-8 mt-6 -ml-2.5">
+      <div className="md:hidden flex items-stretch gap-2 mb-8 mt-6 -ml-2.5">
         <button
           type="button"
           onClick={(e) => {
@@ -9472,10 +9491,10 @@ const Dashboard = ({
         </div>
       </div>
 
-      {activeTab === "overview" && (
+      {(activeTab === "overview" || activeTab === "overview_v2") && (
         <div className="animate-in fade-in slide-in-from-right-4 duration-300">
           {/* Header */}
-          <div className="mb-2 ml-1 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="mt-4 md:mt-5 mb-2 ml-1 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="size-10 rounded-2xl bg-[#154be2]/10 flex items-center justify-center shrink-0 border border-[#154be2]/20">
                 <User className="size-5 text-[#154be2]" />
@@ -9483,10 +9502,12 @@ const Dashboard = ({
               <div>
                 <h1 className="text-lg font-semibold text-[#181a2c] tracking-tight">
                   Executive{" "}
-                  <span className="text-primary font-bold">Overview</span>
+                  <span className="text-primary font-bold">
+                    {activeTab === "overview_v2" ? "Overview V2" : "Overview"}
+                  </span>
                 </h1>
                 <p className="text-[11px] text-[#8E94B7] font-semibold uppercase tracking-wider mt-0.5">
-                  Analisis Kinerja & Pemantauan Tingkat Nasional
+                  Analisis Kinerja & Pemantauan Tingkat Nasional{activeTab === "overview_v2" ? " V2" : ""}
                 </p>
               </div>
             </div>
@@ -9501,6 +9522,7 @@ const Dashboard = ({
                     className="bg-transparent text-sm font-black text-white focus:outline-none focus:ring-0 appearance-none cursor-pointer pr-7 pl-1 py-1 leading-tight"
                   >
                     <option value="overview" className="text-slate-900 bg-white font-semibold">Overview</option>
+                    <option value="monitoring" className="text-slate-900 bg-white font-semibold">Monitoring</option>
                     <option value="activity" className="text-slate-900 bg-white font-semibold">Activity</option>
                     <option value="nominal" className="text-slate-900 bg-white font-semibold">Nominal</option>
                     <option value="reach" className="text-slate-900 bg-white font-semibold">Reach</option>
@@ -9821,591 +9843,995 @@ const Dashboard = ({
             </div>
           </div>
 
-          <div className="mb-3.5">
+          <div className="mb-2">
             {renderGrandTotalCard()}
           </div>
 
           {/* Charts Grid Row 1 */}
-          <div className="grid grid-cols-1 lg:grid-cols-11 gap-6 mb-6">
+          <div className={activeTab === "overview_v2" ? "flex flex-col gap-4 mb-4" : "grid grid-cols-1 lg:grid-cols-11 gap-4 lg:gap-6 mb-4 lg:mb-6"}>
             {/* Chart 1: Sales (POG) & Stock per Area / Dimension */}
-            <div className="order-2 lg:order-1 lg:col-span-8 bg-white p-4 lg:p-5 rounded-[48px] shadow-[0_12px_32px_rgba(21,75,226,0.18)] border border-[#154be2]/8 flex flex-col gap-0 lg:h-[600px] h-fit">
-              <div className="flex flex-col gap-1 mb-1 pb-1 border-b border-[#f0effc]/60">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => {
-                          setFocusedChartType("main");
-                          setIsChartFocusedModalOpen(true);
-                        }}
-                        className="p-1 hover:bg-[#154be2]/10 active:bg-[#154be2]/20 transition-all rounded-lg border border-[#154be2]/10 text-primary flex items-center justify-center shrink-0 cursor-pointer"
-                        title="Fokus Grafik Utama"
-                      >
-                        <span className="material-symbols-outlined text-sm font-semibold">
-                          {overviewGroupDimension === "material"
-                            ? "widgets"
+            <div className={
+              activeTab === "overview_v2"
+                ? `order-2 w-full bg-white p-3 lg:p-4 rounded-[32px] shadow-[0_12px_32px_rgba(21,75,226,0.18)] border border-[#154be2]/8 flex flex-col gap-0 lg:h-auto h-fit`
+                : `order-2 lg:order-1 lg:col-span-8 bg-white p-3 lg:p-4 rounded-[32px] shadow-[0_12px_32px_rgba(21,75,226,0.18)] border border-[#154be2]/8 flex flex-col gap-0 ${overviewMetricFilter === "overview" ? "lg:h-auto" : "lg:h-[480px]"} h-fit`
+            }>
+              {overviewMetricFilter === "overview" ? (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6 flex-1 min-h-0 overflow-y-auto pr-1 pb-1 pt-1">
+                    {/* Chart 1: Dynamic Group Dimension (Bar Chart) */}
+                    {(() => {
+                      const getDimLabel = (dim: string) => {
+                        if (dim === "area") return "Area";
+                        if (dim === "province") return "Province";
+                        if (dim === "sales_agronomist") return "Sales Agronomist";
+                        if (dim === "hybrid" || dim === "material") return "Hybrids";
+                        if (dim === "activity") return "Activity";
+                        return "Dimension";
+                      };
+
+                      const getDimSubtitle = (dim: string) => {
+                        if (dim === "area") return "Kontribusi masing-masing wilayah kerja (Area)";
+                        if (dim === "province") return "Kontribusi masing-masing provinsi";
+                        if (dim === "sales_agronomist") return "Kontribusi masing-masing Sales Agronomist";
+                        if (dim === "hybrid" || dim === "material") return "Kontribusi masing-masing varietas hibrida";
+                        if (dim === "activity") return "Kontribusi masing-masing jenis kegiatan";
+                        return "Kontribusi per dimensi terpilih";
+                      };
+
+                      const chartData = overviewStats.areaChartData || [];
+
+                      return (
+                        <div className="flex flex-col h-full min-h-[220px] lg:min-h-[260px] gap-1 relative">
+                          <div className="flex flex-row items-start justify-between gap-2">
+                            <div>
+                              <h4 className="text-xs font-bold text-[#181a2c] flex items-center gap-1.5">
+                                <span className="size-2 rounded-full bg-primary" />
+                                Proporsi per {getDimLabel(overviewGroupDimension)}
+                              </h4>
+                              <p className="text-[10px] text-[#8E94B7] font-semibold mt-0.5 ml-3.5">
+                                {getDimSubtitle(overviewGroupDimension)}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1.5 bg-[#fbfaff] px-2.5 py-1 rounded-xl border border-[#e2e8f0]/80 shrink-0">
+                              <span className="text-[9px] font-bold text-[#8E94B7] uppercase tracking-wider">
+                                Dimensi:
+                              </span>
+                              <div className="relative flex items-center">
+                                <select
+                                  value={overviewGroupDimension}
+                                  onChange={(e: any) => {
+                                    setOverviewGroupDimension(e.target.value as any);
+                                    setClickedPieIndex(null);
+                                  }}
+                                  className="bg-transparent text-[10.5px] font-black text-[#154be2] focus:outline-none focus:ring-0 appearance-none cursor-pointer pr-5 py-0"
+                                >
+                                  <option value="area">Area</option>
+                                  <option value="province">Province</option>
+                                  <option value="sales_agronomist">Sales Agronomist</option>
+                                  <option value="hybrid">Hybrids</option>
+                                  <option value="activity">Activity</option>
+                                </select>
+                                <span className="material-symbols-outlined absolute right-0 top-1/2 -translate-y-1/2 text-[12px] text-primary pointer-events-none">
+                                  expand_more
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="w-full h-[180px] sm:h-[210px] lg:h-[290px] relative">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart
+                                data={chartData}
+                                margin={{ top: 25, right: 10, left: -10, bottom: 5 }}
+                              >
+                                <CartesianGrid
+                                  strokeDasharray="4 4"
+                                  vertical={false}
+                                  stroke="#e2e8f0"
+                                />
+                                <XAxis
+                                  dataKey="name"
+                                  axisLine={false}
+                                  tickLine={false}
+                                  interval={0}
+                                  height={45}
+                                  tick={<OverviewXAxisTick />}
+                                />
+                                <YAxis
+                                  hide={true}
+                                />
+                                <Tooltip
+                                  cursor={{ fill: "rgba(21, 75, 226, 0.03)" }}
+                                  formatter={(value: any, name: any) => {
+                                    let formattedValue = value;
+                                    if (chartMetric === "nominal") {
+                                      formattedValue = `Rp ${(value / 1000000).toFixed(0)} Jt`;
+                                    } else {
+                                      formattedValue = Number(value).toLocaleString("id-ID");
+                                    }
+                                    return [formattedValue, "Actual"];
+                                  }}
+                                  contentStyle={{ borderRadius: "16px", border: "1px solid #e2e8f0", boxShadow: "0 10px 25px rgba(0,0,0,0.05)", fontWeight: "bold" }}
+                                />
+                                <Bar
+                                  dataKey={
+                                    chartMetric === "activity"
+                                      ? "actualActivity"
+                                      : chartMetric === "reach"
+                                      ? "actualReach"
+                                      : "actualNominal"
+                                  }
+                                  name="Actual"
+                                  radius={[6, 6, 0, 0]}
+                                  maxBarSize={65}
+                                >
+                                  {chartData.map((entry: any, index: number) => {
+                                    const colors = ["#154be2", "#06b6d4", "#f59e0b", "#10b981", "#8b5cf6", "#ec4899", "#14b8a6"];
+                                    const color = colors[index % colors.length];
+                                    return <Cell key={`dim-bar-cell-${index}`} fill={color} />;
+                                  })}
+                                  <LabelList
+                                    dataKey={
+                                      chartMetric === "activity"
+                                        ? "actualActivity"
+                                        : chartMetric === "reach"
+                                        ? "actualReach"
+                                        : "actualNominal"
+                                    }
+                                    content={<CustomActualLabel metricType={chartMetric} />}
+                                  />
+                                </Bar>
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Chart 2: Dynamic Sub Group Dimension (Pie Chart) */}
+                    {(() => {
+                      const getDimLabel = (dim: string) => {
+                        if (dim === "area") return "Area";
+                        if (dim === "province") return "Province";
+                        if (dim === "sales_agronomist") return "Sales Agronomist";
+                        if (dim === "hybrid" || dim === "material") return "Hybrids";
+                        if (dim === "activity") return "Activity";
+                        return "Dimension";
+                      };
+
+                      const getDimSubtitle = (dim: string) => {
+                        if (dim === "area") return "Kontribusi masing-masing wilayah kerja (Area)";
+                        if (dim === "province") return "Kontribusi masing-masing provinsi";
+                        if (dim === "sales_agronomist") return "Kontribusi masing-masing Sales Agronomist";
+                        if (dim === "hybrid" || dim === "material") return "Kontribusi masing-masing varietas hibrida";
+                        if (dim === "activity") return "Kontribusi masing-masing jenis kegiatan";
+                        return "Kontribusi per sub-dimensi terpilih";
+                      };
+
+                      const subData = overviewStats.subChartData || [];
+                      const metricKey = chartMetric === "activity"
+                        ? "actualActivity"
+                        : chartMetric === "reach"
+                        ? "actualReach"
+                        : "actualNominal";
+
+                      let largestSubIndex = -1;
+                      let maxSubValue = -1;
+                      subData.forEach((entry: any, index: number) => {
+                        const val = Number(entry[metricKey]) || 0;
+                        if (val > maxSubValue) {
+                          maxSubValue = val;
+                          largestSubIndex = index;
+                        }
+                      });
+
+                      const activeIndex = clickedPieIndex !== null ? clickedPieIndex : largestSubIndex;
+
+                      return (
+                        <div className="flex flex-col h-full min-h-[220px] lg:min-h-[260px] gap-1 relative">
+                          <div className="flex flex-row items-start justify-between gap-2">
+                            <div>
+                              <h4 className="text-xs font-bold text-[#181a2c] flex items-center gap-1.5">
+                                <span className="size-2 rounded-full bg-cyan-500" />
+                                Proporsi per {getDimLabel(subGroupDimension)}
+                              </h4>
+                              <p className="text-[10px] text-[#8E94B7] font-semibold mt-0.5 ml-3.5">
+                                {getDimSubtitle(subGroupDimension)}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1.5 bg-[#fbfaff] px-2.5 py-1 rounded-xl border border-[#e2e8f0]/80 shrink-0">
+                              <span className="text-[9px] font-bold text-[#8E94B7] uppercase tracking-wider">
+                                Sub:
+                              </span>
+                              <div className="relative flex items-center">
+                                <select
+                                  value={subGroupDimension}
+                                  onChange={(e: any) => {
+                                    setSubGroupDimension(e.target.value as any);
+                                    setClickedPieIndex(null);
+                                  }}
+                                  className="bg-transparent text-[10.5px] font-black text-[#154be2] focus:outline-none focus:ring-0 appearance-none cursor-pointer pr-5 py-0"
+                                >
+                                  <option value="area">Area</option>
+                                  <option value="province">Province</option>
+                                  <option value="sales_agronomist">Sales Agronomist</option>
+                                  <option value="hybrid">Hybrids</option>
+                                  <option value="activity">Activity</option>
+                                </select>
+                                <span className="material-symbols-outlined absolute right-0 top-1/2 -translate-y-1/2 text-[12px] text-primary pointer-events-none">
+                                  expand_more
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="w-full h-[180px] sm:h-[210px] lg:h-[290px] relative">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart margin={{ top: 25, right: 65, left: 65, bottom: 25 }}>
+                                <Pie
+                                  data={subData}
+                                  cx="50%"
+                                  cy="50%"
+                                  outerRadius={105}
+                                  dataKey={metricKey}
+                                  nameKey="name"
+                                  activeIndex={activeIndex}
+                                  onClick={(data, index) => {
+                                    setClickedPieIndex(prev => prev === index ? null : index);
+                                  }}
+                                  activeShape={(props: any) => {
+                                    const RADIAN = Math.PI / 180;
+                                    const {
+                                      cx,
+                                      cy,
+                                      midAngle,
+                                      innerRadius,
+                                      outerRadius,
+                                      startAngle,
+                                      endAngle,
+                                      fill,
+                                    } = props;
+                                    const sin = Math.sin(-midAngle * RADIAN);
+                                    const cos = Math.cos(-midAngle * RADIAN);
+                                    const mx = cx + 14 * cos;
+                                    const my = cy + 14 * sin;
+
+                                    return (
+                                      <g>
+                                        <Sector
+                                          cx={mx}
+                                          cy={my}
+                                          innerRadius={innerRadius}
+                                          outerRadius={outerRadius + 8}
+                                          startAngle={startAngle}
+                                          endAngle={endAngle}
+                                          fill={fill}
+                                        />
+                                      </g>
+                                    );
+                                  }}
+                                  labelLine={true}
+                                  label={(props: any) => {
+                                    const { cx, cy, midAngle, value, name, x, y, index } = props;
+                                    let formattedValue = value;
+                                    if (chartMetric === "nominal") {
+                                      formattedValue = `Rp ${(value / 1000000).toFixed(0)} Jt`;
+                                    } else {
+                                      formattedValue = Number(value).toLocaleString("id-ID");
+                                    }
+
+                                    const isActive = index === activeIndex;
+
+                                    // Shift label coordinates slightly for the active/exploded slice
+                                    let lx = x;
+                                    let ly = y;
+                                    if (isActive) {
+                                      const RADIAN = Math.PI / 180;
+                                      const sin = Math.sin(-midAngle * RADIAN);
+                                      const cos = Math.cos(-midAngle * RADIAN);
+                                      lx += 15 * cos;
+                                      ly += 15 * sin;
+                                    }
+                                    
+                                    // Split name if too long to make it wrap
+                                    let nameLines = [name];
+                                    if (name.length > 10 && name.includes(" ")) {
+                                      const words = name.split(" ");
+                                      const mid = Math.floor(words.length / 2);
+                                      nameLines = [words.slice(0, mid).join(" "), words.slice(mid).join(" ")];
+                                    }
+
+                                    return (
+                                      <text
+                                        x={lx}
+                                        y={ly}
+                                        fill={isActive ? "#154be2" : "#1e293b"}
+                                        textAnchor={lx > cx ? "start" : "end"}
+                                        dominantBaseline="central"
+                                        className={
+                                          isActive
+                                            ? "text-[12px] sm:text-[13px] lg:text-[14px] font-black drop-shadow-sm transition-all duration-300"
+                                            : "text-[9px] sm:text-[10px] lg:text-[11px] font-extrabold"
+                                        }
+                                      >
+                                        {nameLines.map((line, i) => (
+                                          <tspan key={i} x={lx} dy={i === 0 ? (nameLines.length > 1 ? "-1em" : "-0.5em") : "1.2em"}>
+                                            {line}
+                                          </tspan>
+                                        ))}
+                                        <tspan x={lx} dy="1.2em" fill={isActive ? "#1d4ed8" : "#64748b"} className="font-semibold">
+                                          {formattedValue}
+                                        </tspan>
+                                      </text>
+                                    );
+                                  }}
+                                >
+                                  {subData.map((entry: any, index: number) => {
+                                    const colors = ["#154be2", "#3b82f6", "#06b6d4", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6"];
+                                    const color = colors[index % colors.length];
+                                    return <Cell key={`sub-pie-cell-${index}`} fill={color} />;
+                                  })}
+                                </Pie>
+                                {clickedPieIndex === null && (
+                                  <Tooltip
+                                    formatter={(value: any, name: any) => {
+                                      let formattedValue = value;
+                                      if (chartMetric === "nominal") {
+                                        formattedValue = `Rp ${(value / 1000000).toFixed(0)} Jt`;
+                                      } else {
+                                        formattedValue = Number(value).toLocaleString("id-ID");
+                                      }
+                                      return [formattedValue, name];
+                                    }}
+                                    contentStyle={{ borderRadius: "16px", border: "1px solid #e2e8f0", boxShadow: "0 10px 25px rgba(0,0,0,0.05)", fontWeight: "bold" }}
+                                  />
+                                )}
+                              </PieChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex flex-col gap-1.5 mb-1 pb-1 border-b border-[#f0effc]/60">
+                    <div className="flex items-center justify-between flex-wrap gap-3 pb-1">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            setFocusedChartType("main");
+                            setIsChartFocusedModalOpen(true);
+                          }}
+                          className="p-1 hover:bg-[#154be2]/10 active:bg-[#154be2]/20 transition-all rounded-lg border border-[#154be2]/10 text-primary flex items-center justify-center shrink-0 cursor-pointer"
+                          title="Fokus Grafik Utama"
+                        >
+                          <span className="material-symbols-outlined text-sm font-semibold">
+                            {overviewGroupDimension === "material"
+                              ? "widgets"
+                              : overviewGroupDimension === "province"
+                                ? "map"
+                                : "analytics"}
+                          </span>
+                        </button>
+                        <h3 className="text-xs font-bold text-[#181a2c] tracking-tight">
+                          {overviewGroupDimension === "area"
+                            ? "Budget Effectiveness Wilayah (Area)"
                             : overviewGroupDimension === "province"
-                              ? "map"
-                              : "analytics"}
-                        </span>
-                      </button>
-                      <h3 className="text-xs font-bold text-[#181a2c] tracking-tight">
-                        {overviewGroupDimension === "area"
-                          ? "Budget Effectiveness Wilayah (Area)"
-                          : overviewGroupDimension === "province"
-                            ? "Budget Effectiveness per Provinsi"
-                            : overviewGroupDimension === "sales_agronomist"
-                              ? "Budget Effectiveness Sales Agronomist (SA)"
-                              : overviewGroupDimension === "hybrid" || overviewGroupDimension === "material"
-                                ? "Budget Effectiveness per Hybrid"
-                                : "Budget Effectiveness per Activity"}
-                      </h3>
-                    </div>
-                  </div>
-                </div>
+                              ? "Budget Effectiveness per Provinsi"
+                              : overviewGroupDimension === "sales_agronomist"
+                                ? "Budget Effectiveness Sales Agronomist (SA)"
+                                : overviewGroupDimension === "hybrid" || overviewGroupDimension === "material"
+                                  ? "Budget Effectiveness per Hybrid"
+                                  : "Budget Effectiveness per Activity"}
+                        </h3>
+                      </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-3 w-full">
-                  {/* Selector Filter 2: Dimensi Grouping */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex items-center gap-2 bg-[#fbfaff] px-2.5 py-1 rounded-xl border border-[#e2e8f0]/80">
-                      <span className="text-[9.5px] font-bold text-[#8E94B7] uppercase tracking-wider">
-                        Dimensi:
-                      </span>
-                      <div className="relative">
-                        <select
-                          value={overviewGroupDimension}
-                          onChange={(e: any) =>
-                            setOverviewGroupDimension(e.target.value as any)
-                          }
-                          className="bg-transparent text-[10.5px] font-black text-[#154be2] focus:outline-none focus:ring-0 appearance-none cursor-pointer pr-6 py-0.5"
-                        >
-                          <option value="area">Area</option>
-                          <option value="province">Province</option>
-                          <option value="sales_agronomist">Sales Agronomist</option>
-                          <option value="hybrid">Hybrids</option>
-                          <option value="activity">Activity</option>
-                        </select>
-                        <span className="material-symbols-outlined absolute right-0 top-1/2 -translate-y-1/2 text-[14px] text-primary pointer-events-none">
-                          expand_more
-                        </span>
+                      <div className="flex items-center gap-3 shrink-0 select-none">
+                        {activeTab === "overview_v2" && (
+                          <div className="flex items-center gap-1.5 bg-[#fbfaff] px-2.5 py-1.5 rounded-xl border border-[#e2e8f0]/80">
+                            <span className="text-[9.5px] font-bold text-[#8E94B7] uppercase tracking-wider">
+                              Dimensi:
+                            </span>
+                            <div className="relative flex items-center">
+                              <select
+                                value={overviewGroupDimension}
+                                onChange={(e: any) =>
+                                  setOverviewGroupDimension(e.target.value as any)
+                                }
+                                className="bg-transparent text-[10.5px] font-black text-[#154be2] focus:outline-none focus:ring-0 appearance-none cursor-pointer pr-5 py-0"
+                              >
+                                <option value="area">Area</option>
+                                <option value="province">Province</option>
+                                <option value="sales_agronomist">Sales Agronomist</option>
+                                <option value="hybrid">Hybrids</option>
+                                <option value="activity">Activity</option>
+                              </select>
+                              <span className="material-symbols-outlined absolute right-0 top-1/2 -translate-y-1/2 text-[12px] text-primary pointer-events-none">
+                                expand_more
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        {/* Legend aligned side-by-side with title */}
+                        <div className="flex items-center gap-5 bg-[#fbfaff] px-4 py-2 rounded-xl border border-[#e2e8f0]/50 shadow-sm">
+                          <button
+                            type="button"
+                            onClick={() => setShowBudgetBar(prev => !prev)}
+                            className={`flex items-center gap-2.5 hover:opacity-85 transition-all cursor-pointer ${!showBudgetBar ? "opacity-35 line-through" : ""}`}
+                            title="Klik untuk menyembunyikan/menampilkan Budget"
+                          >
+                            <span className="size-3.5 rounded-[4px] bg-gradient-to-tr from-[#154be2] to-[#3b82f6]" />
+                            <span className="text-[12.5px] font-extrabold text-[#4e5572]">
+                              Budget
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowActualBar(prev => !prev)}
+                            className={`flex items-center gap-2.5 hover:opacity-85 transition-all cursor-pointer ${!showActualBar ? "opacity-35 line-through" : ""}`}
+                            title="Klik untuk menyembunyikan/menampilkan Actual"
+                          >
+                            <span className="size-3.5 rounded-[4px] bg-gradient-to-tr from-[#06b6d4] to-[#22d3ee]" />
+                            <span className="text-[12.5px] font-extrabold text-[#4e5572]">
+                              Actual
+                            </span>
+                          </button>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Selector Filter: Sub Grouping */}
-                    <div className="flex items-center gap-2 bg-[#fbfaff] px-2.5 py-1 rounded-xl border border-[#e2e8f0]/80">
-                      <span className="text-[9.5px] font-bold text-[#8E94B7] uppercase tracking-wider">
-                        Sub:
-                      </span>
-                      <div className="relative">
-                        <select
-                          value={subGroupDimension}
-                          onChange={(e: any) =>
-                            setSubGroupDimension(e.target.value as any)
-                          }
-                          className="bg-transparent text-[10.5px] font-black text-[#154be2] focus:outline-none focus:ring-0 appearance-none cursor-pointer pr-6 py-0.5"
-                        >
-                          <option value="area">Area</option>
-                          <option value="province">Province</option>
-                          <option value="sales_agronomist">Sales Agronomist</option>
-                          <option value="hybrid">Hybrids</option>
-                          <option value="activity">Activity</option>
-                        </select>
-                        <span className="material-symbols-outlined absolute right-0 top-1/2 -translate-y-1/2 text-[14px] text-primary pointer-events-none">
-                          expand_more
-                        </span>
+                    {/* Dimension & Sub-dimension dropdowns under chart title on tabs OTHER than overview_v2 */}
+                    {activeTab !== "overview_v2" && (
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <div className="flex items-center gap-2 bg-[#fbfaff] px-2.5 py-1 rounded-xl border border-[#e2e8f0]/80">
+                          <span className="text-[9.5px] font-bold text-[#8E94B7] uppercase tracking-wider">
+                            Dimensi:
+                          </span>
+                          <div className="relative">
+                            <select
+                              value={overviewGroupDimension}
+                              onChange={(e: any) =>
+                                setOverviewGroupDimension(e.target.value as any)
+                              }
+                              className="bg-transparent text-[10.5px] font-black text-[#154be2] focus:outline-none focus:ring-0 appearance-none cursor-pointer pr-6 py-0.5"
+                            >
+                              <option value="area">Area</option>
+                              <option value="province">Province</option>
+                              <option value="sales_agronomist">Sales Agronomist</option>
+                              <option value="hybrid">Hybrids</option>
+                              <option value="activity">Activity</option>
+                            </select>
+                            <span className="material-symbols-outlined absolute right-0 top-1/2 -translate-y-1/2 text-[14px] text-primary pointer-events-none">
+                              expand_more
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Selector Filter: Sub Grouping */}
+                        <div className="flex items-center gap-2 bg-[#fbfaff] px-2.5 py-1 rounded-xl border border-[#e2e8f0]/80">
+                          <span className="text-[9.5px] font-bold text-[#8E94B7] uppercase tracking-wider">
+                            Sub:
+                          </span>
+                          <div className="relative">
+                            <select
+                              value={subGroupDimension}
+                              onChange={(e: any) =>
+                                setSubGroupDimension(e.target.value as any)
+                              }
+                              className="bg-transparent text-[10.5px] font-black text-[#154be2] focus:outline-none focus:ring-0 appearance-none cursor-pointer pr-6 py-0.5"
+                            >
+                              <option value="area">Area</option>
+                              <option value="province">Province</option>
+                              <option value="sales_agronomist">Sales Agronomist</option>
+                              <option value="hybrid">Hybrids</option>
+                              <option value="activity">Activity</option>
+                            </select>
+                            <span className="material-symbols-outlined absolute right-0 top-1/2 -translate-y-1/2 text-[14px] text-primary pointer-events-none">
+                              expand_more
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
 
-                  <div className="flex items-center gap-3 shrink-0 ml-auto select-none">
-                    {/* Legend aligned side-by-side */}
-                    <div className="flex items-center gap-4 bg-[#fbfaff] px-3.5 py-1.5 rounded-xl border border-[#e2e8f0]/40">
-                      <button
-                        type="button"
-                        onClick={() => setShowBudgetBar(prev => !prev)}
-                        className={`flex items-center gap-2 hover:opacity-85 transition-all cursor-pointer ${!showBudgetBar ? "opacity-35 line-through" : ""}`}
-                        title="Klik untuk menyembunyikan/menampilkan Budget"
-                      >
-                        <span className="size-3.5 rounded-[4px] bg-gradient-to-tr from-[#154be2] to-[#3b82f6]" />
-                        <span className="text-[12px] font-extrabold text-[#4e5572]">
-                          Budget
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowActualBar(prev => !prev)}
-                        className={`flex items-center gap-2 hover:opacity-85 transition-all cursor-pointer ${!showActualBar ? "opacity-35 line-through" : ""}`}
-                        title="Klik untuk menyembunyikan/menampilkan Actual"
-                      >
-                        <span className="size-3.5 rounded-[4px] bg-gradient-to-tr from-[#06b6d4] to-[#22d3ee]" />
-                        <span className="text-[12px] font-extrabold text-[#4e5572]">
-                          Actual
-                        </span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="w-full overflow-x-auto scrollbar-thin select-none">
-                <div
-                  style={{
-                    minWidth: `${Math.max(600, overviewStats.areaChartData.length * 95)}px`,
-                    width: "100%",
-                    height: "230px",
-                  }}
-                  className="font-sans"
-                >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={overviewStats.areaChartData}
-                      margin={{ top: 38, right: 10, left: -10, bottom: 0 }}
-                      barGap={currentBarGap}
-                      barCategoryGap={currentBarCategoryGap}
-                      onMouseMove={(state) => {
-                        if (state && state.activeLabel) {
-                          setHoveredLabel(state.activeLabel);
-                          if (state.activeLabel !== dismissedTooltipLabel) {
-                            setDismissedTooltipLabel(null);
-                          }
-                        } else {
-                          setHoveredLabel(null);
-                        }
+                  <div className="w-full overflow-x-auto scrollbar-thin select-none">
+                    <div
+                      style={{
+                        minWidth: `${Math.max(600, overviewStats.areaChartData.length * 95)}px`,
+                        width: "100%",
+                        height: "230px",
                       }}
-                      onMouseLeave={() => {
-                        setHoveredLabel(null);
-                      }}
+                      className="font-sans"
                     >
-                      <defs>
-                        <linearGradient
-                          id="colorAreaPog"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={overviewStats.areaChartData}
+                          margin={{ top: 38, right: 10, left: -10, bottom: 0 }}
+                          barGap={currentBarGap}
+                          barCategoryGap={currentBarCategoryGap}
+                          onMouseMove={(state) => {
+                            if (state && state.activeLabel) {
+                              setHoveredLabel(state.activeLabel);
+                              if (state.activeLabel !== dismissedTooltipLabelRef.current) {
+                                changeDismissedTooltipLabel(null);
+                              }
+                            } else {
+                              setHoveredLabel(null);
+                            }
+                          }}
+                          onMouseLeave={() => {
+                            setHoveredLabel(null);
+                          }}
                         >
-                          <stop
-                            offset="0%"
-                            stopColor="#154be2"
-                            stopOpacity={0.95}
+                          <defs>
+                            <linearGradient
+                              id="colorAreaPog"
+                              x1="0"
+                              y1="0"
+                              x2="0"
+                              y2="1"
+                            >
+                              <stop
+                                offset="0%"
+                                stopColor="#154be2"
+                                stopOpacity={0.95}
+                              />
+                              <stop
+                                offset="100%"
+                                stopColor="#3b82f6"
+                                stopOpacity={0.7}
+                              />
+                            </linearGradient>
+                            <linearGradient
+                              id="colorAreaStock"
+                              x1="0"
+                              y1="0"
+                              x2="0"
+                              y2="1"
+                            >
+                              <stop
+                                offset="0%"
+                                stopColor="#06b6d4"
+                                stopOpacity={1.0}
+                              />
+                              <stop
+                                offset="100%"
+                                stopColor="#22d3ee"
+                                stopOpacity={1.0}
+                              />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid
+                            strokeDasharray="4 4"
+                            vertical={false}
+                            stroke="#e2e8f0"
                           />
-                          <stop
-                            offset="100%"
-                            stopColor="#3b82f6"
-                            stopOpacity={0.7}
+                          <XAxis
+                            dataKey="name"
+                            tick={<CustomXAxisTick chartData={overviewStats.areaChartData} metricType={chartMetric} />}
+                            axisLine={false}
+                            tickLine={false}
+                            interval={0}
+                            height={65}
                           />
-                        </linearGradient>
-                        <linearGradient
-                          id="colorAreaStock"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
-                        >
-                          <stop
-                            offset="0%"
-                            stopColor="#06b6d4"
-                            stopOpacity={1.0}
+                          <YAxis
+                            hide={true}
+                            domain={[0, (dataMax: any) => (dataMax === 0 ? 100 : Math.round(dataMax * 1.25))]}
+                            tick={{ fill: "#8E94B7", fontSize: 9, fontWeight: 500 }}
+                            axisLine={false}
+                            tickLine={false}
                           />
-                          <stop
-                            offset="100%"
-                            stopColor="#22d3ee"
-                            stopOpacity={1.0}
+                          <Tooltip
+                            cursor={{ fill: "rgba(21, 75, 226, 0.03)" }}
+                            wrapperStyle={{ pointerEvents: "auto" }}
+                            content={
+                              <CustomChartTooltip
+                                metricType={chartMetric}
+                                dismissedLabel={dismissedTooltipLabel}
+                                onClose={(lbl: string) => {
+                                  changeDismissedTooltipLabel(lbl);
+                                  setActiveMainBarKey(null);
+                                }}
+                              />
+                            }
                           />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid
-                        strokeDasharray="4 4"
-                        vertical={false}
-                        stroke="#e2e8f0"
-                      />
-                      <XAxis
-                        dataKey="name"
-                        tick={<CustomXAxisTick chartData={overviewStats.areaChartData} metricType={chartMetric} />}
-                        axisLine={false}
-                        tickLine={false}
-                        interval={0}
-                        height={65}
-                      />
-                      <YAxis
-                        hide={true}
-                        domain={[0, (dataMax: any) => (dataMax === 0 ? 100 : Math.round(dataMax * 1.25))]}
-                        tick={{ fill: "#8E94B7", fontSize: 9, fontWeight: 500 }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <Tooltip
-                        cursor={{ fill: "rgba(21, 75, 226, 0.03)" }}
-                        wrapperStyle={{ pointerEvents: "auto" }}
-                        content={
-                          <CustomChartTooltip
-                            metricType={chartMetric}
-                            dismissedLabel={dismissedTooltipLabel}
-                            onClose={(lbl: string) => {
-                              setDismissedTooltipLabel(lbl);
-                              setActiveMainBarKey(null);
-                            }}
-                          />
-                        }
-                      />
-                      <Bar
-                        hide={!showBudgetBar}
-                        dataKey={
-                          chartMetric === "activity"
-                            ? "budgetActivity"
-                            : chartMetric === "reach"
-                            ? "budgetReach"
-                            : "budgetNominal"
-                        }
-                        name="Budget"
-                        fill="url(#colorAreaPog)"
-                        radius={[6, 6, 0, 0]}
-                        maxBarSize={currentMaxBarSize}
-                        background={<CustomBarBackground data={overviewStats.areaChartData} activeKey={activeMainBarKey} />}
-                      >
-                        {overviewStats.areaChartData.map((entry: any, index: number) => {
-                          const isActive = activeMainBarKey === entry.name;
-                          return (
-                            <Cell
-                              key={`cell-budget-${index}`}
-                              cursor="pointer"
-                              fill={isActive ? "#ea580c" : "url(#colorAreaPog)"}
-                              fillOpacity={1.0}
-                              onClick={() => {
-                                clickedBarRef.current = true;
-                                if (activeMainBarKey === entry.name) {
-                                  setDismissedTooltipLabel(entry.name);
-                                } else {
-                                  setDismissedTooltipLabel(null);
-                                }
-                                setActiveMainBarKey(prev => prev === entry.name ? null : entry.name);
-                              }}
+                          <Bar
+                            hide={!showBudgetBar}
+                            dataKey={
+                              chartMetric === "activity"
+                                ? "budgetActivity"
+                                : chartMetric === "reach"
+                                ? "budgetReach"
+                                : "budgetNominal"
+                            }
+                            name="Budget"
+                            fill="url(#colorAreaPog)"
+                            radius={[6, 6, 0, 0]}
+                            maxBarSize={currentMaxBarSize}
+                            background={<CustomBarBackground data={overviewStats.areaChartData} activeKey={activeMainBarKey} />}
+                          >
+                            {overviewStats.areaChartData.map((entry: any, index: number) => {
+                              const isActive = activeMainBarKey === entry.name;
+                              return (
+                                <Cell
+                                  key={`cell-budget-${index}`}
+                                  cursor="pointer"
+                                  fill={isActive ? "#ea580c" : "url(#colorAreaPog)"}
+                                  fillOpacity={1.0}
+                                  onClick={() => {
+                                    clickedBarRef.current = true;
+                                    if (activeMainBarKey === entry.name) {
+                                      setDismissedTooltipLabel(entry.name);
+                                    } else {
+                                      setDismissedTooltipLabel(null);
+                                    }
+                                    setActiveMainBarKey(prev => prev === entry.name ? null : entry.name);
+                                  }}
+                                />
+                              );
+                            })}
+                            <LabelList
+                              dataKey={
+                                chartMetric === "activity"
+                                  ? "budgetActivity"
+                                  : chartMetric === "reach"
+                                  ? "budgetReach"
+                                  : "budgetNominal"
+                              }
+                              content={<CustomBudgetLabel metricType={chartMetric} />}
                             />
-                          );
-                        })}
-                        <LabelList
-                          dataKey={
-                            chartMetric === "activity"
-                              ? "budgetActivity"
-                              : chartMetric === "reach"
-                              ? "budgetReach"
-                              : "budgetNominal"
-                          }
-                          content={<CustomBudgetLabel metricType={chartMetric} />}
-                        />
-                      </Bar>
-                      <Bar
-                        hide={!showActualBar}
-                        dataKey={
-                          chartMetric === "activity"
-                            ? "actualActivity"
-                            : chartMetric === "reach"
-                            ? "actualReach"
-                            : "actualNominal"
-                        }
-                        name="Actual"
-                        fill="url(#colorAreaStock)"
-                        radius={[6, 6, 0, 0]}
-                        maxBarSize={currentMaxBarSize}
-                        background={<CustomBarBackground data={overviewStats.areaChartData} activeKey={activeMainBarKey} />}
-                      >
-                        {overviewStats.areaChartData.map((entry: any, index: number) => {
-                          const isActive = activeMainBarKey === entry.name;
-                          return (
-                            <Cell
-                              key={`cell-actual-${index}`}
-                              cursor="pointer"
-                              fill={isActive ? "#f97316" : "url(#colorAreaStock)"}
-                              fillOpacity={1.0}
-                              onClick={() => {
-                                clickedBarRef.current = true;
-                                if (activeMainBarKey === entry.name) {
-                                  setDismissedTooltipLabel(entry.name);
-                                } else {
-                                  setDismissedTooltipLabel(null);
-                                }
-                                setActiveMainBarKey(prev => prev === entry.name ? null : entry.name);
-                              }}
+                          </Bar>
+                          <Bar
+                            hide={!showActualBar}
+                            dataKey={
+                              chartMetric === "activity"
+                                ? "actualActivity"
+                                : chartMetric === "reach"
+                                ? "actualReach"
+                                : "actualNominal"
+                            }
+                            name="Actual"
+                            fill="url(#colorAreaStock)"
+                            radius={[6, 6, 0, 0]}
+                            maxBarSize={currentMaxBarSize}
+                            background={<CustomBarBackground data={overviewStats.areaChartData} activeKey={activeMainBarKey} />}
+                          >
+                            {overviewStats.areaChartData.map((entry: any, index: number) => {
+                              const isActive = activeMainBarKey === entry.name;
+                              return (
+                                <Cell
+                                  key={`cell-actual-${index}`}
+                                  cursor="pointer"
+                                  fill={isActive ? "#f97316" : "url(#colorAreaStock)"}
+                                  fillOpacity={1.0}
+                                  onClick={() => {
+                                    clickedBarRef.current = true;
+                                    if (activeMainBarKey === entry.name) {
+                                      setDismissedTooltipLabel(entry.name);
+                                    } else {
+                                      setDismissedTooltipLabel(null);
+                                    }
+                                    setActiveMainBarKey(prev => prev === entry.name ? null : entry.name);
+                                  }}
+                                />
+                              );
+                            })}
+                            <LabelList
+                              dataKey={
+                                chartMetric === "activity"
+                                  ? "actualActivity"
+                                  : chartMetric === "reach"
+                                  ? "actualReach"
+                                  : "actualNominal"
+                              }
+                              content={<CustomActualLabel metricType={chartMetric} />}
                             />
-                          );
-                        })}
-                        <LabelList
-                          dataKey={
-                            chartMetric === "activity"
-                              ? "actualActivity"
-                              : chartMetric === "reach"
-                              ? "actualReach"
-                              : "actualNominal"
-                          }
-                          content={<CustomActualLabel metricType={chartMetric} />}
-                        />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
 
-              {/* Divider and Subheading for Sub Bar Chart */}
-              <div className="mt-0.5 pt-0.5 border-t border-[#f0effc]/40 flex flex-col gap-0.5 shrink-0">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <button
-                        onClick={() => {
-                          setFocusedChartType("sub");
-                          setIsChartFocusedModalOpen(true);
-                        }}
-                        className="p-1 hover:bg-[#06b6d4]/10 active:bg-[#06b6d4]/20 transition-all rounded-lg border border-[#06b6d4]/10 text-[#06b6d4] flex items-center justify-center shrink-0 cursor-pointer"
-                        title="Fokus Grafik Sub"
-                      >
-                        <span className="material-symbols-outlined text-[13px] font-semibold">
-                          bar_chart
-                        </span>
-                      </button>
-                      <h3 className="text-[11px] font-bold text-[#181a2c] tracking-tight">
-                        {subGroupDimension === "area"
-                          ? "Sub Budget Effectiveness Wilayah (Area)"
-                          : subGroupDimension === "province"
-                            ? "Sub Budget Effectiveness per Provinsi"
-                            : subGroupDimension === "sales_agronomist"
-                              ? "Sub Budget Effectiveness Sales Agronomist (SA)"
-                              : subGroupDimension === "hybrid" || subGroupDimension === "material"
-                                ? "Sub Budget Effectiveness per Hybrid"
-                                : "Sub Budget Effectiveness per Activity"}
-                      </h3>
-                      {activeMainBarKey && (
-                        <button
-                          onClick={() => setActiveMainBarKey(null)}
-                          className="ml-auto text-[9px] font-bold text-[#154be2] bg-[#154be2]/10 hover:bg-[#154be2]/20 px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer"
-                          title="Click to clear filter"
-                        >
-                          <span>Filter: {activeMainBarKey}</span>
-                          <span className="material-symbols-outlined text-[10px] font-bold">close</span>
-                        </button>
-                      )}
-                      {activeActivityFilter && (
-                        <button
-                          onClick={() => setActiveActivityFilter(null)}
-                          className={`${activeMainBarKey ? "ml-2" : "ml-auto"} text-[9px] font-bold text-amber-600 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer`}
-                          title="Click to clear Activity filter"
-                        >
-                          <span>Activity: {activeActivityFilter}</span>
-                          <span className="material-symbols-outlined text-[10px] font-bold">close</span>
-                        </button>
+                  {/* Divider and Subheading for Sub Bar Chart */}
+                  <div className="mt-0.5 pt-0.5 border-t border-[#f0effc]/40 flex flex-col gap-0.5 shrink-0">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <button
+                            onClick={() => {
+                              setFocusedChartType("sub");
+                              setIsChartFocusedModalOpen(true);
+                            }}
+                            className="p-1 hover:bg-[#06b6d4]/10 active:bg-[#06b6d4]/20 transition-all rounded-lg border border-[#06b6d4]/10 text-[#06b6d4] flex items-center justify-center shrink-0 cursor-pointer"
+                            title="Fokus Grafik Sub"
+                          >
+                            <span className="material-symbols-outlined text-[13px] font-semibold">
+                              bar_chart
+                            </span>
+                          </button>
+                          <h3 className="text-[11px] font-bold text-[#181a2c] tracking-tight">
+                            {subGroupDimension === "area"
+                              ? "Sub Budget Effectiveness Wilayah (Area)"
+                              : subGroupDimension === "province"
+                                ? "Sub Budget Effectiveness per Provinsi"
+                                : subGroupDimension === "sales_agronomist"
+                                  ? "Sub Budget Effectiveness Sales Agronomist (SA)"
+                                  : subGroupDimension === "hybrid" || subGroupDimension === "material"
+                                    ? "Sub Budget Effectiveness per Hybrid"
+                                    : "Sub Budget Effectiveness per Activity"}
+                          </h3>
+                          {activeMainBarKey && (
+                            <button
+                              onClick={() => setActiveMainBarKey(null)}
+                              className="ml-auto text-[9px] font-bold text-[#154be2] bg-[#154be2]/10 hover:bg-[#154be2]/20 px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer"
+                              title="Click to clear filter"
+                            >
+                              <span>Filter: {activeMainBarKey}</span>
+                              <span className="material-symbols-outlined text-[10px] font-bold">close</span>
+                            </button>
+                          )}
+                          {activeActivityFilter && (
+                            <button
+                              onClick={() => setActiveActivityFilter(null)}
+                              className={`${activeMainBarKey ? "ml-2" : "ml-auto"} text-[9px] font-bold text-amber-600 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer`}
+                              title="Click to clear Activity filter"
+                            >
+                              <span>Activity: {activeActivityFilter}</span>
+                              <span className="material-symbols-outlined text-[10px] font-bold">close</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {activeTab === "overview_v2" && (
+                        <div className="flex items-center gap-1.5 bg-[#fbfaff] px-2.5 py-1 rounded-xl border border-[#e2e8f0]/80 shrink-0 select-none">
+                          <span className="text-[9px] font-bold text-[#8E94B7] uppercase tracking-wider">
+                            Sub:
+                          </span>
+                          <div className="relative flex items-center">
+                            <select
+                              value={subGroupDimension}
+                              onChange={(e: any) => {
+                                setSubGroupDimension(e.target.value as any);
+                                setClickedPieIndex(null);
+                              }}
+                              className="bg-transparent text-[10.5px] font-black text-[#154be2] focus:outline-none focus:ring-0 appearance-none cursor-pointer pr-5 py-0"
+                            >
+                              <option value="area">Area</option>
+                              <option value="province">Province</option>
+                              <option value="sales_agronomist">Sales Agronomist</option>
+                              <option value="hybrid">Hybrids</option>
+                              <option value="activity">Activity</option>
+                            </select>
+                            <span className="material-symbols-outlined absolute right-0 top-1/2 -translate-y-1/2 text-[12px] text-primary pointer-events-none">
+                              expand_more
+                            </span>
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>
-                </div>
-              </div>
 
-              {/* Second Bar Chart: Sub Group Dimension */}
-              <div className="w-full overflow-x-auto scrollbar-thin select-none mt-0">
-                <div
-                  style={{
-                    minWidth: `${Math.max(600, (overviewStats.subChartData?.length || 0) * 95)}px`,
-                    width: "100%",
-                    height: "230px",
-                  }}
-                  className="font-sans"
-                >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={overviewStats.subChartData || []}
-                      margin={{ top: 38, right: 10, left: -10, bottom: 0 }}
-                      barGap={currentBarGap}
-                      barCategoryGap={currentBarCategoryGap}
-                      onMouseMove={(state) => {
-                        if (state && state.activeLabel) {
-                          setHoveredLabel(state.activeLabel);
-                          if (state.activeLabel !== dismissedSubTooltipLabel) {
-                            setDismissedSubTooltipLabel(null);
-                          }
-                        } else {
-                          setHoveredLabel(null);
-                        }
+                  {/* Second Bar Chart: Sub Group Dimension */}
+                  <div className="w-full overflow-x-auto scrollbar-thin select-none mt-0">
+                    <div
+                      style={{
+                        minWidth: `${Math.max(600, (overviewStats.subChartData?.length || 0) * 95)}px`,
+                        width: "100%",
+                        height: "230px",
                       }}
-                      onMouseLeave={() => {
-                        setHoveredLabel(null);
-                      }}
+                      className="font-sans"
                     >
-                      <defs>
-                        <linearGradient
-                          id="colorSubPog"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={overviewStats.subChartData || []}
+                          margin={{ top: 38, right: 10, left: -10, bottom: 0 }}
+                          barGap={currentBarGap}
+                          barCategoryGap={currentBarCategoryGap}
+                          onMouseMove={(state) => {
+                            if (state && state.activeLabel) {
+                              setHoveredLabel(state.activeLabel);
+                              if (state.activeLabel !== dismissedSubTooltipLabelRef.current) {
+                                changeDismissedSubTooltipLabel(null);
+                              }
+                            } else {
+                              setHoveredLabel(null);
+                            }
+                          }}
+                          onMouseLeave={() => {
+                            setHoveredLabel(null);
+                          }}
                         >
-                          <stop
-                            offset="0%"
-                            stopColor="#154be2"
-                            stopOpacity={0.95}
+                          <defs>
+                            <linearGradient
+                              id="colorSubPog"
+                              x1="0"
+                              y1="0"
+                              x2="0"
+                              y2="1"
+                            >
+                              <stop
+                                offset="0%"
+                                stopColor="#154be2"
+                                stopOpacity={0.95}
+                              />
+                              <stop
+                                offset="100%"
+                                stopColor="#3b82f6"
+                                stopOpacity={0.7}
+                              />
+                            </linearGradient>
+                            <linearGradient
+                              id="colorSubStock"
+                              x1="0"
+                              y1="0"
+                              x2="0"
+                              y2="1"
+                            >
+                              <stop
+                                offset="0%"
+                                stopColor="#06b6d4"
+                                stopOpacity={1.0}
+                              />
+                              <stop
+                                offset="100%"
+                                stopColor="#22d3ee"
+                                stopOpacity={1.0}
+                              />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid
+                            strokeDasharray="4 4"
+                            vertical={false}
+                            stroke="#e2e8f0"
                           />
-                          <stop
-                            offset="100%"
-                            stopColor="#3b82f6"
-                            stopOpacity={0.7}
+                          <XAxis
+                            dataKey="name"
+                            tick={<CustomXAxisTick chartData={overviewStats.subChartData} metricType={chartMetric} />}
+                            axisLine={false}
+                            tickLine={false}
+                            interval={0}
+                            height={65}
                           />
-                        </linearGradient>
-                        <linearGradient
-                          id="colorSubStock"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
-                        >
-                          <stop
-                            offset="0%"
-                            stopColor="#06b6d4"
-                            stopOpacity={1.0}
+                          <YAxis
+                            hide={true}
+                            domain={[0, (dataMax: any) => (dataMax === 0 ? 100 : Math.round(dataMax * 1.25))]}
+                            tick={{ fill: "#8E94B7", fontSize: 9, fontWeight: 500 }}
+                            axisLine={false}
+                            tickLine={false}
                           />
-                          <stop
-                            offset="100%"
-                            stopColor="#22d3ee"
-                            stopOpacity={1.0}
+                          <Tooltip
+                            cursor={{ fill: "rgba(21, 75, 226, 0.03)" }}
+                            wrapperStyle={{ pointerEvents: "auto" }}
+                            content={
+                              <CustomChartTooltip
+                                metricType={chartMetric}
+                                dismissedLabel={dismissedSubTooltipLabel}
+                                onClose={(lbl: string) => {
+                                  changeDismissedSubTooltipLabel(lbl);
+                                  setActiveSubBarKey(null);
+                                }}
+                              />
+                            }
                           />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid
-                        strokeDasharray="4 4"
-                        vertical={false}
-                        stroke="#e2e8f0"
-                      />
-                      <XAxis
-                        dataKey="name"
-                        tick={<CustomXAxisTick chartData={overviewStats.subChartData} metricType={chartMetric} />}
-                        axisLine={false}
-                        tickLine={false}
-                        interval={0}
-                        height={65}
-                      />
-                      <YAxis
-                        hide={true}
-                        domain={[0, (dataMax: any) => (dataMax === 0 ? 100 : Math.round(dataMax * 1.25))]}
-                        tick={{ fill: "#8E94B7", fontSize: 9, fontWeight: 500 }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <Tooltip
-                        cursor={{ fill: "rgba(21, 75, 226, 0.03)" }}
-                        wrapperStyle={{ pointerEvents: "auto" }}
-                        content={
-                          <CustomChartTooltip
-                            metricType={chartMetric}
-                            dismissedLabel={dismissedSubTooltipLabel}
-                            onClose={(lbl: string) => {
-                              setDismissedSubTooltipLabel(lbl);
-                              setActiveSubBarKey(null);
-                            }}
-                          />
-                        }
-                      />
-                      <Bar
-                        hide={!showBudgetBar}
-                        dataKey={
-                          chartMetric === "activity"
-                            ? "budgetActivity"
-                            : chartMetric === "reach"
-                            ? "budgetReach"
-                            : "budgetNominal"
-                        }
-                        name="Budget"
-                        fill="url(#colorSubPog)"
-                        radius={[6, 6, 0, 0]}
-                        maxBarSize={currentMaxBarSize}
-                        background={<CustomBarBackground data={overviewStats.subChartData || []} activeKey={activeSubBarKey} />}
-                      >
-                        {(overviewStats.subChartData || []).map((entry: any, index: number) => {
-                          const isActive = activeSubBarKey === entry.name;
-                          return (
-                            <Cell
-                              key={`cell-sub-budget-${index}`}
-                              cursor="pointer"
-                              fill={isActive ? "#ea580c" : "url(#colorSubPog)"}
-                              fillOpacity={1.0}
-                              onClick={() => {
-                                clickedBarRef.current = true;
-                                if (activeSubBarKey === entry.name) {
-                                  setDismissedSubTooltipLabel(entry.name);
-                                } else {
-                                  setDismissedSubTooltipLabel(null);
-                                }
-                                setActiveSubBarKey(prev => prev === entry.name ? null : entry.name);
-                              }}
+                          <Bar
+                            hide={!showBudgetBar}
+                            dataKey={
+                              chartMetric === "activity"
+                                ? "budgetActivity"
+                                : chartMetric === "reach"
+                                ? "budgetReach"
+                                : "budgetNominal"
+                            }
+                            name="Budget"
+                            fill="url(#colorSubPog)"
+                            radius={[6, 6, 0, 0]}
+                            maxBarSize={currentMaxBarSize}
+                            background={<CustomBarBackground data={overviewStats.subChartData || []} activeKey={activeSubBarKey} />}
+                          >
+                            {(overviewStats.subChartData || []).map((entry: any, index: number) => {
+                              const isActive = activeSubBarKey === entry.name;
+                              return (
+                                <Cell
+                                  key={`cell-sub-budget-${index}`}
+                                  cursor="pointer"
+                                  fill={isActive ? "#ea580c" : "url(#colorSubPog)"}
+                                  fillOpacity={1.0}
+                                  onClick={() => {
+                                    clickedBarRef.current = true;
+                                    if (activeSubBarKey === entry.name) {
+                                      setDismissedSubTooltipLabel(entry.name);
+                                    } else {
+                                      setDismissedSubTooltipLabel(null);
+                                    }
+                                    setActiveSubBarKey(prev => prev === entry.name ? null : entry.name);
+                                  }}
+                                />
+                              );
+                            })}
+                            <LabelList
+                              dataKey={
+                                chartMetric === "activity"
+                                  ? "budgetActivity"
+                                  : chartMetric === "reach"
+                                  ? "budgetReach"
+                                  : "budgetNominal"
+                              }
+                              content={<CustomBudgetLabel metricType={chartMetric} />}
                             />
-                          );
-                        })}
-                        <LabelList
-                          dataKey={
-                            chartMetric === "activity"
-                              ? "budgetActivity"
-                              : chartMetric === "reach"
-                              ? "budgetReach"
-                              : "budgetNominal"
-                          }
-                          content={<CustomBudgetLabel metricType={chartMetric} />}
-                        />
-                      </Bar>
-                      <Bar
-                        hide={!showActualBar}
-                        dataKey={
-                          chartMetric === "activity"
-                            ? "actualActivity"
-                            : chartMetric === "reach"
-                            ? "actualReach"
-                            : "actualNominal"
-                        }
-                        name="Actual"
-                        fill="url(#colorSubStock)"
-                        radius={[6, 6, 0, 0]}
-                        maxBarSize={currentMaxBarSize}
-                        background={<CustomBarBackground data={overviewStats.subChartData || []} activeKey={activeSubBarKey} />}
-                      >
-                        {(overviewStats.subChartData || []).map((entry: any, index: number) => {
-                          const isActive = activeSubBarKey === entry.name;
-                          return (
-                            <Cell
-                              key={`cell-sub-actual-${index}`}
-                              cursor="pointer"
-                              fill={isActive ? "#f97316" : "url(#colorSubStock)"}
-                              fillOpacity={1.0}
-                              onClick={() => {
-                                clickedBarRef.current = true;
-                                if (activeSubBarKey === entry.name) {
-                                  setDismissedSubTooltipLabel(entry.name);
-                                } else {
-                                  setDismissedSubTooltipLabel(null);
-                                }
-                                setActiveSubBarKey(prev => prev === entry.name ? null : entry.name);
-                              }}
+                          </Bar>
+                          <Bar
+                            hide={!showActualBar}
+                            dataKey={
+                              chartMetric === "activity"
+                                ? "actualActivity"
+                                : chartMetric === "reach"
+                                ? "actualReach"
+                                : "actualNominal"
+                            }
+                            name="Actual"
+                            fill="url(#colorSubStock)"
+                            radius={[6, 6, 0, 0]}
+                            maxBarSize={currentMaxBarSize}
+                            background={<CustomBarBackground data={overviewStats.subChartData || []} activeKey={activeSubBarKey} />}
+                          >
+                            {(overviewStats.subChartData || []).map((entry: any, index: number) => {
+                              const isActive = activeSubBarKey === entry.name;
+                              return (
+                                <Cell
+                                  key={`cell-sub-actual-${index}`}
+                                  cursor="pointer"
+                                  fill={isActive ? "#f97316" : "url(#colorSubStock)"}
+                                  fillOpacity={1.0}
+                                  onClick={() => {
+                                    clickedBarRef.current = true;
+                                    if (activeSubBarKey === entry.name) {
+                                      setDismissedSubTooltipLabel(entry.name);
+                                    } else {
+                                      setDismissedSubTooltipLabel(null);
+                                    }
+                                    setActiveSubBarKey(prev => prev === entry.name ? null : entry.name);
+                                  }}
+                                />
+                              );
+                            })}
+                            <LabelList
+                              dataKey={
+                                chartMetric === "activity"
+                                  ? "actualActivity"
+                                  : chartMetric === "reach"
+                                  ? "actualReach"
+                                  : "actualNominal"
+                              }
+                              content={<CustomActualLabel metricType={chartMetric} />}
                             />
-                          );
-                        })}
-                        <LabelList
-                          dataKey={
-                            chartMetric === "activity"
-                              ? "actualActivity"
-                              : chartMetric === "reach"
-                              ? "actualReach"
-                              : "actualNominal"
-                          }
-                          content={<CustomActualLabel metricType={chartMetric} />}
-                        />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* KPI Cards Stack (Replacing Segmentasi Partner) */}
-            <div className="order-1 lg:order-2 lg:col-span-3 flex flex-col h-full min-h-0">
-              <div className={`flex flex-col px-3.5 lg:pl-4.5 lg:pr-3 py-3.5 pb-8 ${
-                overviewMetricFilter === "overview"
-                  ? "lg:h-[600px] lg:justify-between gap-4"
-                  : "overflow-y-auto max-h-[460px] lg:max-h-[600px] lg:h-[600px] gap-3.5 scrollbar-thin"
-              }`}>
-                {overviewMetricFilter === "overview" ? (
+            <div className={activeTab === "overview_v2" ? "order-1 flex flex-col w-full min-h-0 mt-3 md:mt-4" : "order-1 lg:order-2 lg:col-span-3 flex flex-col h-full min-h-0"}>
+              <div className={activeTab === "overview_v2" ? (
+                (overviewMetricFilter === "overview" || overviewMetricFilter === "monitoring")
+                  ? "w-full pb-2"
+
+                  : "grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 w-full pb-2 overflow-y-auto max-h-[460px] lg:max-h-[600px]"
+              ) : (
+                `flex flex-col px-3.5 lg:pl-4.5 lg:pr-3 py-3.5 pb-3 lg:pb-6 ${
+                  (overviewMetricFilter === "overview" || overviewMetricFilter === "monitoring")
+                    ? "lg:h-[410px] lg:justify-between gap-3.5"
+                    : "overflow-y-auto max-h-[460px] lg:max-h-[600px] lg:h-[600px] gap-3.5 scrollbar-thin"
+                }`
+              )}>
+                {(overviewMetricFilter === "overview" || overviewMetricFilter === "monitoring") ? (
                   (() => {
                     const formatNominalValueLocal = (val: number) => {
                       const abs = Math.abs(val);
@@ -10459,107 +10885,128 @@ const Dashboard = ({
                       }
                     ];
 
-                    return overviewCardsLocal.map((card) => {
-                      const isSelected = overviewSubFilter === card.key;
-                      const pct = card.pct;
-                      const radius = 22;
-                      const circumference = 2 * Math.PI * radius;
-                      const strokeDashoffset = circumference * (1 - Math.min(1, pct / 100));
+                    const renderedCards = overviewCardsLocal.map((card, idx) => {
+                          const isSelected = overviewSubFilter === card.key;
+                          const pct = card.pct;
+                          const radius = 22;
+                          const circumference = 2 * Math.PI * radius;
+                          const strokeDashoffset = circumference * (1 - Math.min(1, pct / 100));
 
-                      const gap = card.gap;
-                      const gapSign = gap > 0 ? "+" : "";
+                          const gap = card.gap;
+                          const gapSign = gap > 0 ? "+" : "";
 
-                      let displayGapStr = "";
-                      if (card.key === "nominal") {
-                        displayGapStr = `${gapSign}${formatNominalValueLocal(gap)}`;
-                      } else if (card.key === "reach") {
-                        displayGapStr = `${gapSign}${formatReachValueLocal(gap)}`;
-                      } else {
-                        displayGapStr = `${gapSign}${gap.toLocaleString("id-ID")}`;
-                      }
-                      if (gap === 0) displayGapStr = "0";
+                          let displayGapStr = "";
+                          if (card.key === "nominal") {
+                            displayGapStr = `${gapSign}${formatNominalValueLocal(gap)}`;
+                          } else if (card.key === "reach") {
+                            displayGapStr = `${gapSign}${formatReachValueLocal(gap)}`;
+                          } else {
+                            displayGapStr = `${gapSign}${gap.toLocaleString("id-ID")}`;
+                          }
+                          if (gap === 0) displayGapStr = "0";
 
-                      // Determine card-specific background and active/inactive shadow styling
-                      let cardStyle = "";
-                      let shadowStyle = "";
-                      
-                      if (card.key === "activity") {
-                        cardStyle = "bg-gradient-to-r from-[#154be2] to-[#3b82f6] text-white border border-blue-400/30";
-                        shadowStyle = isSelected 
-                          ? "shadow-[0_20px_40px_-4px_rgba(21,75,226,0.55)] scale-[1.025] z-10 opacity-100 ring-2 ring-blue-400/30" 
-                          : "shadow-none opacity-[0.76] hover:opacity-[0.92] hover:scale-[1.01] hover:shadow-[0_10px_24px_rgba(21,75,226,0.25)]";
-                      } else if (card.key === "nominal") {
-                        cardStyle = "bg-gradient-to-r from-amber-500 to-orange-500 text-white border border-amber-400/30";
-                        shadowStyle = isSelected 
-                          ? "shadow-[0_20px_40px_-4px_rgba(245,158,11,0.55)] scale-[1.025] z-10 opacity-100 ring-2 ring-amber-400/30" 
-                          : "shadow-none opacity-[0.76] hover:opacity-[0.92] hover:scale-[1.01] hover:shadow-[0_10px_24px_rgba(245,158,11,0.25)]";
-                      } else {
-                        cardStyle = "bg-gradient-to-r from-emerald-600 to-teal-500 text-white border border-emerald-400/30";
-                        shadowStyle = isSelected 
-                          ? "shadow-[0_20px_40px_-4px_rgba(5,150,105,0.55)] scale-[1.025] z-10 opacity-100 ring-2 ring-emerald-400/30" 
-                          : "shadow-none opacity-[0.76] hover:opacity-[0.92] hover:scale-[1.01] hover:shadow-[0_10px_24px_rgba(5,150,105,0.25)]";
-                      }
+                          // Determine card-specific background and active/inactive shadow styling
+                          let cardStyle = "";
+                          let shadowStyle = "";
+                          
+                          if (card.key === "activity") {
+                            cardStyle = "bg-gradient-to-r from-[#154be2] to-[#3b82f6] text-white border border-blue-400/30";
+                            shadowStyle = isSelected 
+                              ? "shadow-[0_20px_40px_-4px_rgba(21,75,226,0.55)] scale-[1.025] z-10 opacity-100 ring-2 ring-blue-400/30" 
+                              : "shadow-none opacity-100 hover:scale-[1.01] hover:shadow-[0_10px_24px_rgba(21,75,226,0.25)]";
+                          } else if (card.key === "nominal") {
+                            cardStyle = "bg-gradient-to-r from-amber-500 to-orange-500 text-white border border-amber-400/30";
+                            shadowStyle = isSelected 
+                              ? "shadow-[0_20px_40px_-4px_rgba(245,158,11,0.55)] scale-[1.025] z-10 opacity-100 ring-2 ring-amber-400/30" 
+                              : "shadow-none opacity-100 hover:scale-[1.01] hover:shadow-[0_10px_24px_rgba(245,158,11,0.25)]";
+                          } else {
+                            cardStyle = "bg-gradient-to-r from-emerald-600 to-teal-500 text-white border border-emerald-400/30";
+                            shadowStyle = isSelected 
+                              ? "shadow-[0_20px_40px_-4px_rgba(5,150,105,0.55)] scale-[1.025] z-10 opacity-100 ring-2 ring-emerald-400/30" 
+                              : "shadow-none opacity-100 hover:scale-[1.01] hover:shadow-[0_10px_24px_rgba(5,150,105,0.25)]";
+                          }
 
-                      return (
-                        <button
-                          key={card.key}
-                          onClick={() => setOverviewSubFilter(card.key as any)}
-                          className={`rounded-[32px] flex flex-row items-center justify-between relative overflow-hidden group transition-all duration-300 w-full text-left cursor-pointer border-0 py-6 px-5 lg:flex-1 lg:min-h-0 min-h-[110px] ${cardStyle} ${shadowStyle}`}
-                        >
-                          <div className="flex flex-col justify-center z-10 min-w-0 flex-1 pr-2">
-                            <div className="mb-0.5">
-                              <span className="text-[9px] px-2 py-0.5 font-black rounded-md uppercase tracking-wider bg-white/20 text-white border border-white/10">
-                                {card.title}
-                              </span>
-                            </div>
-                            <h4 className="text-[15px] font-black leading-tight truncate text-white">
-                              {card.subtitle}
-                            </h4>
-                            <div className="mt-2 flex flex-col items-start gap-1">
-                              <div className="flex items-center gap-1 font-sans font-black text-[13px] text-white">
-                                <span>{card.actualStr}</span>
-                                <span className="text-white/40">/</span>
-                                <span className="font-sans font-extrabold text-[12.5px] text-white/80">{card.budgetStr}</span>
+                          return (
+                            <button
+                              key={card.key}
+                              onClick={() => setOverviewSubFilter(card.key as any)}
+                              className={`rounded-[32px] flex flex-row items-center justify-between relative overflow-hidden group transition-all duration-300 w-full text-left cursor-pointer border-0 py-4 xs:py-5 sm:py-6 pl-4 xs:pl-5 pr-[90px] xs:pr-[105px] sm:pr-[115px] md:pr-[125px] ${activeTab === "overview_v2" ? "col-span-1" : "lg:flex-1 lg:min-h-0"} min-h-[110px] ${cardStyle} ${shadowStyle}`}
+                            >
+                              <div className="flex flex-col justify-center z-10 min-w-0 flex-1 pr-1">
+                                {activeTab !== "overview_v2" && (
+                                  <div className="mb-0.5 xs:mb-1">
+                                    <span className="text-[8px] xs:text-[9px] px-1.5 xs:px-2 py-0.5 font-black rounded-md uppercase tracking-wider bg-white/20 text-white border border-white/10">
+                                      {card.title}
+                                    </span>
+                                  </div>
+                                )}
+                                <h4 className="text-[12px] xs:text-[13.5px] sm:text-[14.5px] font-black leading-tight sm:leading-snug text-white break-words whitespace-normal">
+                                  {card.subtitle}
+                                </h4>
+                                <div className="mt-1.5 xs:mt-2 flex flex-col items-start gap-0.5 xs:gap-1">
+                                  <div className="flex flex-wrap items-center gap-0.5 xs:gap-1 font-sans font-black text-[11px] xs:text-[12px] sm:text-[13px] text-white">
+                                    <span>{card.actualStr}</span>
+                                    <span className="text-white/40">/</span>
+                                    <span className="font-sans font-extrabold text-[10.5px] xs:text-[11.5px] sm:text-[12.5px] text-white/80">{card.budgetStr}</span>
+                                  </div>
+                                  <div className="mt-0.5 xs:mt-1">
+                                    <span className="px-1 xs:px-1.5 py-0.5 rounded text-[9.5px] xs:text-[10px] sm:text-[11px] font-black bg-white/20 text-white border border-white/10">
+                                      {displayGapStr}
+                                    </span>
+                                  </div>
+                                </div>
                               </div>
-                              <div className="mt-1">
-                                <span className="px-1.5 py-0.5 rounded text-[11px] font-black bg-white/20 text-white border border-white/10">
-                                  {displayGapStr}
-                                </span>
+
+                              {/* Curved Progress Indicator */}
+                              <CurvedProgressIndicator pct={pct} index={idx} />
+                            </button>
+                          );
+                        });
+
+                    return (
+                      <>
+                        {activeTab === "overview_v2" ? (
+                          <>
+                            {/* Desktop Layout */}
+                            <div className="hidden lg:grid w-full lg:grid-cols-[auto_1fr_1fr_1fr] gap-3 lg:gap-4 items-stretch">
+                              <div className="flex items-center justify-center pr-0 w-[140px] xl:w-[180px]">
+                                <img
+                                  src="/jagoan.png"
+                                  className="w-full h-auto max-h-[160px] xl:max-h-[180px] object-contain object-center drop-shadow-md"
+                                  alt="Jagoan Advanta"
+                                />
+                              </div>
+                              {renderedCards}
+                            </div>
+                            {/* Mobile / Tablet Layout */}
+                            <div className="w-full flex flex-col gap-3 sm:gap-4 lg:hidden">
+                              <div className="w-full flex flex-row gap-2 sm:gap-3 items-stretch">
+                                <div className="flex items-center justify-center shrink-0 w-[95px] sm:w-[125px] md:w-[155px]">
+                                  <img
+                                    src="/jagoan.png"
+                                    className="w-full h-auto max-h-[120px] sm:max-h-[140px] md:max-h-[160px] object-contain object-center drop-shadow-md"
+                                    alt="Jagoan Advanta"
+                                  />
+                                </div>
+                                <div className="flex-1 min-w-0 flex flex-col flex-1 min-w-0 flex flex-col">
+                                  {renderedCards[0]}
+                                </div>
+                              </div>
+                              <div className="w-full flex flex-row gap-3 sm:gap-4 items-stretch">
+                                <div className="flex-1 min-w-0 flex flex-col flex-1 min-w-0 flex flex-col">
+                                  {renderedCards[1]}
+                                </div>
+                                <div className="flex-1 min-w-0 flex flex-col flex-1 min-w-0 flex flex-col">
+                                  {renderedCards[2]}
+                                </div>
                               </div>
                             </div>
-                          </div>
-
-                          {/* Circular Progress */}
-                          <div className="relative size-16 flex items-center justify-center shrink-0 z-10">
-                            <svg className="absolute inset-0 size-full rotate-[-90deg]">
-                              <circle
-                                cx="32"
-                                cy="32"
-                                r={radius}
-                                stroke="rgba(255,255,255,0.25)"
-                                strokeWidth="5.5"
-                                fill="transparent"
-                              />
-                              <circle
-                                cx="32"
-                                cy="32"
-                                r={radius}
-                                stroke="#ffffff"
-                                strokeWidth="5.5"
-                                fill="transparent"
-                                strokeDasharray={circumference}
-                                strokeDashoffset={strokeDashoffset}
-                                strokeLinecap="round"
-                                className="transition-all duration-500 ease-out"
-                              />
-                            </svg>
-                            <span className="font-black text-[11.5px] text-white">
-                              {pct}%
-                            </span>
-                          </div>
-                        </button>
-                      );
-                    });
+                          </>
+                        ) : (
+                          renderedCards
+                        )}
+                      </>
+                    );
                   })()
                 ) : (
                   activityDonutCardsData.map((act) => {
@@ -10666,15 +11113,26 @@ const Dashboard = ({
                             </ResponsiveContainer>
                             {/* Center percentage indicator */}
                             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                              <span className={`font-black ${
-                                act.name === "TOTAL"
-                                  ? "text-[14px]"
-                                  : "text-[11.5px]"
-                              } ${
-                                isSelected ? "text-white" : act.name === "TOTAL" ? "text-[#154be2]" : "text-[#181a2c]"
-                              }`}>
-                                {act.percentage}%
-                              </span>
+                              <div className="flex items-baseline justify-center">
+                                <span className={`font-black leading-none tracking-tight ${
+                                  act.name === "TOTAL"
+                                    ? "text-[16px]"
+                                    : "text-[13px]"
+                                } ${
+                                  isSelected ? "text-white" : act.name === "TOTAL" ? "text-[#154be2]" : "text-[#181a2c]"
+                                }`}>
+                                  {act.percentage}
+                                </span>
+                                <span className={`font-bold leading-none ml-px ${
+                                  act.name === "TOTAL"
+                                    ? "text-[10px]"
+                                    : "text-[8.5px]"
+                                } ${
+                                  isSelected ? "text-white/80" : act.name === "TOTAL" ? "text-[#154be2]/80" : "text-[#8E94B7]"
+                                }`}>
+                                  %
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -10875,8 +11333,8 @@ const Dashboard = ({
                   onMouseMove={(state) => {
                     if (state && state.activeLabel) {
                       setHoveredLabel(state.activeLabel);
-                      if (state.activeLabel !== dismissedTooltipLabel) {
-                        setDismissedTooltipLabel(null);
+                      if (state.activeLabel !== dismissedTooltipLabelRef.current) {
+                        changeDismissedTooltipLabel(null);
                       }
                     } else {
                       setHoveredLabel(null);
@@ -10952,7 +11410,7 @@ const Dashboard = ({
                         metricType={chartMetric}
                         dismissedLabel={dismissedTooltipLabel}
                         onClose={(lbl: string) => {
-                          setDismissedTooltipLabel(lbl);
+                          changeDismissedTooltipLabel(lbl);
                           setActiveMainBarKey(null);
                         }}
                       />
@@ -11221,12 +11679,12 @@ const Dashboard = ({
                           if (state && state.activeLabel) {
                             setHoveredLabel(state.activeLabel);
                             if (focusedChartType === "sub") {
-                              if (state.activeLabel !== dismissedSubTooltipLabel) {
-                                setDismissedSubTooltipLabel(null);
+                              if (state.activeLabel !== dismissedSubTooltipLabelRef.current) {
+                                changeDismissedSubTooltipLabel(null);
                               }
                             } else {
-                              if (state.activeLabel !== dismissedTooltipLabel) {
-                                setDismissedTooltipLabel(null);
+                              if (state.activeLabel !== dismissedTooltipLabelRef.current) {
+                                changeDismissedTooltipLabel(null);
                               }
                             }
                           } else {
@@ -11259,10 +11717,10 @@ const Dashboard = ({
                               dismissedLabel={focusedChartType === "sub" ? dismissedSubTooltipLabel : dismissedTooltipLabel}
                               onClose={(lbl: string) => {
                                 if (focusedChartType === "sub") {
-                                  setDismissedSubTooltipLabel(lbl);
+                                  changeDismissedSubTooltipLabel(lbl);
                                   setActiveSubBarKey(null);
                                 } else {
-                                  setDismissedTooltipLabel(lbl);
+                                  changeDismissedTooltipLabel(lbl);
                                   setActiveMainBarKey(null);
                                 }
                               }}
@@ -12291,7 +12749,7 @@ const Dashboard = ({
         </div>
       )}
 
-      {activeTab === "summary" && (
+      {activeTab === "summary_disabled" && (
         <div className="animate-in fade-in slide-in-from-right-4 duration-300">
           <div className="mb-4 ml-1 flex items-center gap-3">
             <h1 className="text-lg font-semibold text-[#181a2c] tracking-tight">
@@ -12576,7 +13034,7 @@ const Dashboard = ({
         </div>
       )}
 
-      {activeTab === "pog" && (
+      {activeTab === "pog_disabled" && (
         <div className="animate-in fade-in slide-in-from-right-4 duration-300">
           <div className="mb-4 ml-1">
             <h1 className="text-lg font-semibold text-[#181a2c] tracking-tight">
@@ -13010,9 +13468,10 @@ const Dashboard = ({
                   <tr className="bg-[#fbfaff]">
                     <th className="px-5 py-3 text-[10px] font-bold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9]">Position</th>
                     <th className="px-5 py-3 text-[10px] font-bold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9]">Data Partner</th>
-                    <th className="px-5 py-3 text-[10px] font-bold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9]">Stock Summary</th>
-                    <th className="px-5 py-3 text-[10px] font-bold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9]">POG Tracking</th>
+                    <th className="px-5 py-3 text-[10px] font-bold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9]">CDP</th>
+                    <th className="px-5 py-3 text-[10px] font-bold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9]">Tracking</th>
                     <th className="px-5 py-3 text-[10px] font-bold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9]">Overview Tab</th>
+                    <th className="px-5 py-3 text-[10px] font-bold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9]">Overview V2 Tab</th>
                     <th className="px-5 py-3 text-[10px] font-bold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9]">Temp Tab</th>
                     <th className="px-5 py-3 text-[10px] font-bold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9]">Access Menu</th>
                     <th className="px-5 py-3 text-[10px] font-bold text-[#8E94B7] uppercase tracking-wider border-b border-[#f1f5f9] text-right">Aksi</th>
@@ -13025,9 +13484,10 @@ const Dashboard = ({
                         <span className="text-[11px] font-semibold text-[#181a2c] bg-slate-100 px-2 py-1 rounded-md">{position}</span>
                       </td>
                       <td className="px-5 py-4">{renderAccessCheckbox(position, 'partner')}</td>
-                      <td className="px-5 py-4">{renderAccessCheckbox(position, 'stock')}</td>
-                      <td className="px-5 py-4">{renderAccessCheckbox(position, 'pog')}</td>
+                      <td className="px-5 py-4">{renderAccessCheckbox(position, 'cdp')}</td>
+                      <td className="px-5 py-4">{renderAccessCheckbox(position, 'tracking')}</td>
                       <td className="px-5 py-4">{renderAccessCheckbox(position, 'overview')}</td>
+                      <td className="px-5 py-4">{renderAccessCheckbox(position, 'overview_v2')}</td>
                       <td className="px-5 py-4">{renderAccessCheckbox(position, 'temp')}</td>
                       <td className="px-5 py-4">{renderAccessCheckbox(position, 'access')}</td>
                       <td className="px-5 py-4 text-right">
@@ -13046,7 +13506,7 @@ const Dashboard = ({
                 <span className="material-symbols-outlined text-[#8E94B7] text-[18px]">info</span>
                 <p className="text-[10px] font-semibold text-[#8E94B7] leading-relaxed">
                   <span className="text-[#181a2c] font-bold uppercase tracking-wider block mb-1">General Access Rules</span>
-                  All levels have access to the <strong className="text-primary">Home</strong>, <strong className="text-primary">Data Partner</strong>, <strong className="text-primary">Stock Summary</strong>, and <strong className="text-primary">POG Tracking</strong> tabs. The data visible within these tabs is automatically filtered based on the user's <strong className="text-primary">Data Visibility</strong> level. The <strong className="text-primary">Access Menu</strong> tab is strictly limited to authorized system administrators.
+                  All levels have access to the <strong className="text-primary">Home</strong>, <strong className="text-primary">Data Partner</strong>, <strong className="text-primary">CDP</strong>, and <strong className="text-primary">Tracking</strong> tabs. The data visible within these tabs is automatically filtered based on the user's <strong className="text-primary">Data Visibility</strong> level. The <strong className="text-primary">Access Menu</strong> tab is strictly limited to authorized system administrators.
                 </p>
               </div>
               
@@ -14778,6 +15238,46 @@ const Dashboard = ({
         </div>
       )}
 
+      {activeTab === "cdp" && (
+        <div className="animate-in fade-in slide-in-from-right-4 duration-300 min-h-[500px] flex flex-col items-center justify-center p-6 text-center">
+          <div className="relative size-24 bg-gradient-to-tr from-primary to-cyan-500 rounded-[32px] flex items-center justify-center shadow-[0_12px_32px_rgba(21,75,226,0.2)] mb-6 text-white overflow-hidden">
+            <span className="material-symbols-outlined text-[42px] animate-pulse">
+              hub
+            </span>
+          </div>
+          <h2 className="text-2xl font-black text-[#181a2c] tracking-tight mb-2">
+            Customer Data Platform (CDP)
+          </h2>
+          <p className="text-sm font-semibold text-[#8E94B7] max-w-md leading-relaxed mb-6">
+            We are building a unified hub for all customer records, segmentations, and personalized engagement. Stay tuned!
+          </p>
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#154be2]/5 text-[#154be2] text-xs font-bold uppercase tracking-wider border border-[#154be2]/10 shadow-sm">
+            <span className="size-2 rounded-full bg-cyan-400 animate-ping" />
+            Soon
+          </div>
+        </div>
+      )}
+
+      {activeTab === "tracking" && (
+        <div className="animate-in fade-in slide-in-from-right-4 duration-300 min-h-[500px] flex flex-col items-center justify-center p-6 text-center">
+          <div className="relative size-24 bg-gradient-to-tr from-primary to-cyan-500 rounded-[32px] flex items-center justify-center shadow-[0_12px_32px_rgba(21,75,226,0.2)] mb-6 text-white overflow-hidden">
+            <span className="material-symbols-outlined text-[42px] animate-pulse">
+              route
+            </span>
+          </div>
+          <h2 className="text-2xl font-black text-[#181a2c] tracking-tight mb-2">
+            Real-time Tracking
+          </h2>
+          <p className="text-sm font-semibold text-[#8E94B7] max-w-md leading-relaxed mb-6">
+            Advanced activity mapping, location tracking, and visual route analyses are on their way to optimize your fields.
+          </p>
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#154be2]/5 text-[#154be2] text-xs font-bold uppercase tracking-wider border border-[#154be2]/10 shadow-sm">
+            <span className="size-2 rounded-full bg-cyan-400 animate-ping" />
+            Soon
+          </div>
+        </div>
+      )}
+
 
       <LogoutConfirmModal
         isOpen={isLogoutModalOpen}
@@ -15416,7 +15916,14 @@ const CustomChartTooltip = (props: any) => {
   const formattedPct = `${Math.round(pct)}%`;
 
   return (
-    <div className="bg-white/95 backdrop-blur-md p-4 rounded-2xl border border-slate-100 shadow-[0_12px_32px_rgba(21,75,226,0.12)] flex flex-col gap-2 min-w-[200px] relative pointer-events-auto">
+    <div
+      onClick={(e) => {
+        e.stopPropagation();
+        if (onClose) onClose(label);
+      }}
+      className="bg-white/95 backdrop-blur-md p-4 rounded-2xl border border-slate-100 shadow-[0_12px_32px_rgba(21,75,226,0.12)] flex flex-col gap-2 min-w-[200px] relative pointer-events-auto cursor-pointer select-none"
+      title="Klik untuk menutup"
+    >
       {onClose && (
         <button
           type="button"
@@ -15454,6 +15961,38 @@ const CustomChartTooltip = (props: any) => {
         </span>
       </div>
     </div>
+  );
+};
+
+const OverviewXAxisTick = (props: any) => {
+  const { x, y, payload } = props;
+  const value = payload?.value || "";
+  const words = typeof value === "string" ? value.split(" ") : [String(value)];
+  
+  // We can show up to 3 lines for the name to ensure it's fully readable
+  const nameLines = words.slice(0, 3);
+  
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text
+        x={0}
+        y={0}
+        textAnchor="middle"
+        style={{ fontFamily: "Inter, sans-serif" }}
+      >
+        {nameLines.map((word: string, index: number) => (
+          <tspan 
+            x={0} 
+            dy={index === 0 ? 10 : 10} 
+            key={`word-overview-${index}`} 
+            fill="#8E94B7" 
+            style={{ fontSize: "8px", fontWeight: 700 }}
+          >
+            {word}
+          </tspan>
+        ))}
+      </text>
+    </g>
   );
 };
 
@@ -15758,6 +16297,7 @@ export default function App() {
     | "nominal"
     | "reach"
     | "overview"
+    | "monitoring"
   >("activity");
 
   // Filter states for the lower part ("yang dibawah")
@@ -15806,13 +16346,13 @@ export default function App() {
       console.error('Failed to load access rules from localStorage', e);
     }
     return {
-      "Business Analyst": { home: true, partner: true, stock: true, pog: true, overview: true, temp: true, access: true },
-      "Vegetables Sales Manager": { home: true, partner: true, stock: true, pog: true, overview: true, temp: true, access: false },
-      "Commercial Lead": { home: true, partner: true, stock: true, pog: true, overview: true, temp: true, access: false },
-      "Country Head": { home: true, partner: true, stock: true, pog: true, overview: true, temp: true, access: true },
-      "Area Sales Manager": { home: true, partner: true, stock: true, pog: true, overview: false, temp: false, access: false },
-      "Sales Agronomist": { home: true, partner: true, stock: true, pog: true, overview: false, temp: false, access: false },
-      "Business Solution": { home: true, partner: true, stock: true, pog: true, overview: false, temp: false, access: false },
+      "Business Analyst": { home: true, partner: true, cdp: true, tracking: true, overview: true, overview_v2: true, temp: true, access: true },
+      "Vegetables Sales Manager": { home: true, partner: true, cdp: true, tracking: true, overview: true, overview_v2: true, temp: true, access: false },
+      "Commercial Lead": { home: true, partner: true, cdp: true, tracking: true, overview: true, overview_v2: true, temp: true, access: false },
+      "Country Head": { home: true, partner: true, cdp: true, tracking: true, overview: true, overview_v2: true, temp: true, access: true },
+      "Area Sales Manager": { home: true, partner: true, cdp: true, tracking: true, overview: false, overview_v2: false, temp: false, access: false },
+      "Sales Agronomist": { home: true, partner: true, cdp: true, tracking: true, overview: false, overview_v2: false, temp: false, access: false },
+      "Business Solution": { home: true, partner: true, cdp: true, tracking: true, overview: false, overview_v2: false, temp: false, access: false },
     };
   });
 
@@ -15820,9 +16360,10 @@ export default function App() {
     return {
       home: false,
       partner: true,
-      stock: true,
-      pog: true,
+      cdp: true,
+      tracking: true,
       overview: true,
+      overview_v2: true,
       temp: true,
       access: true,
       propose: true,
@@ -15831,9 +16372,10 @@ export default function App() {
 
   const showHomeTab = userData ? !!userAccess.home : false;
   const showPartnerTab = false;
-  const showStockTab = userData ? !!userAccess.stock : false;
-  const showPogTab = userData ? !!userAccess.pog : false;
+  const showCdpTab = userData ? !!userAccess.cdp : false;
+  const showTrackingTab = userData ? !!userAccess.tracking : false;
   const showOverviewTab = userData ? !!userAccess.overview : false;
+  const showOverviewV2Tab = userData ? !!userAccess.overview_v2 : false;
   const showTempTab = userData ? !!userAccess.temp : false;
   const showAccessTab = userData ? (!!userAccess.access || isAditya) : false;
   const showProposeTab = userData ? !!userAccess.propose : false;
@@ -15843,10 +16385,11 @@ export default function App() {
     const isCurrentTabForbidden = 
       (activeTab === "home" && !showHomeTab) ||
       (activeTab === "partner" && !showPartnerTab) ||
-      (activeTab === "summary" && !showStockTab) ||
-      (activeTab === "pog" && !showPogTab) ||
+      (activeTab === "cdp" && !showCdpTab) ||
+      (activeTab === "tracking" && !showTrackingTab) ||
       (activeTab === "temp" && !showTempTab) ||
       (activeTab === "overview" && !showOverviewTab) ||
+      (activeTab === "overview_v2" && !showOverviewV2Tab) ||
       (activeTab === "access" && !showAccessTab) ||
       (activeTab === "propose" && !showProposeTab);
 
@@ -15854,9 +16397,10 @@ export default function App() {
       let targetTab = "";
       if (showHomeTab) targetTab = "home";
       else if (showOverviewTab) targetTab = "overview";
+      else if (showOverviewV2Tab) targetTab = "overview_v2";
       else if (showPartnerTab) targetTab = "partner";
-      else if (showStockTab) targetTab = "summary";
-      else if (showPogTab) targetTab = "pog";
+      else if (showCdpTab) targetTab = "cdp";
+      else if (showTrackingTab) targetTab = "tracking";
       else if (showTempTab) targetTab = "temp";
       else if (showAccessTab) targetTab = "access";
       else if (showProposeTab) targetTab = "propose";
@@ -15873,25 +16417,27 @@ export default function App() {
       if (
         (!showHomeTab && activeTab === "home") ||
         (!showPartnerTab && activeTab === "partner") ||
-        (!showStockTab && activeTab === "summary") ||
-        (!showPogTab && activeTab === "pog") ||
+        (!showCdpTab && activeTab === "cdp") ||
+        (!showTrackingTab && activeTab === "tracking") ||
         (!showTempTab && activeTab === "temp") ||
         (!showOverviewTab && activeTab === "overview") ||
+        (!showOverviewV2Tab && activeTab === "overview_v2") ||
         (!showAccessTab && activeTab === "access") ||
         (!showProposeTab && activeTab === "propose")
       ) {
         // Find first available tab
         if (showHomeTab) setActiveTab("home");
         else if (showOverviewTab) setActiveTab("overview");
+        else if (showOverviewV2Tab) setActiveTab("overview_v2");
         else if (showPartnerTab) setActiveTab("partner");
-        else if (showStockTab) setActiveTab("summary");
-        else if (showPogTab) setActiveTab("pog");
+        else if (showCdpTab) setActiveTab("cdp");
+        else if (showTrackingTab) setActiveTab("tracking");
         else if (showTempTab) setActiveTab("temp");
         else if (showAccessTab) setActiveTab("access");
         else if (showProposeTab) setActiveTab("propose");
       }
     }
-  }, [userData, activeTab, showHomeTab, showPartnerTab, showStockTab, showPogTab, showTempTab, showOverviewTab, showAccessTab, showProposeTab]);
+  }, [userData, activeTab, showHomeTab, showPartnerTab, showCdpTab, showTrackingTab, showTempTab, showOverviewTab, showOverviewV2Tab, showAccessTab, showProposeTab]);
 
   // Load Google Material Symbols for icons
   useEffect(() => {
@@ -16090,7 +16636,7 @@ export default function App() {
                 analytics
               </span>
               <span className={`font-extrabold text-xs hidden ${isSidebarExpanded ? "lg:block" : ""}`}>
-                Executive Overview
+                Overview
               </span>
             </button>
           ) : null}
@@ -16110,7 +16656,23 @@ export default function App() {
                 analytics
               </span>
               <span className={`font-semibold text-xs hidden ${isSidebarExpanded ? "lg:block" : ""}`}>
-                Executive Overview
+                Overview
+              </span>
+            </button>
+          )}
+
+          {showOverviewV2Tab && (
+            <button
+              onClick={() => setActiveTab("overview_v2")}
+              className={`flex items-center justify-center lg:justify-start gap-3 h-13 rounded-xl transition-all ${activeTab === "overview_v2" ? "bg-[#154be2]/15 text-[#154be2] shadow-[0_4px_12px_rgba(21,75,226,0.12)] ring-1 ring-[#154be2]/15 font-bold" : "text-[#8E94B7] hover:bg-white/40 hover:text-[#181a2c]"}`}
+            >
+              <span
+                className={`material-symbols-outlined ml-0 lg:ml-4 ${activeTab === "overview_v2" ? "font-normal" : ""}`}
+              >
+                analytics
+              </span>
+              <span className={`font-semibold text-xs hidden ${isSidebarExpanded ? "lg:block" : ""}`}>
+                Overview V2
               </span>
             </button>
           )}
@@ -16131,34 +16693,34 @@ export default function App() {
             </button>
           )}
 
-          {showStockTab && (
+          {showCdpTab && (
             <button
-              onClick={() => setActiveTab("summary")}
-              className={`flex items-center justify-center lg:justify-start gap-3 h-13 rounded-xl transition-all ${activeTab === "summary" ? "bg-[#154be2]/15 text-[#154be2] shadow-[0_4px_12px_rgba(21,75,226,0.12)] ring-1 ring-[#154be2]/15 font-bold" : "text-[#8E94B7] hover:bg-white/40 hover:text-[#181a2c]"}`}
+              onClick={() => setActiveTab("cdp")}
+              className={`flex items-center justify-center lg:justify-start gap-3 h-13 rounded-xl transition-all ${activeTab === "cdp" ? "bg-[#154be2]/15 text-[#154be2] shadow-[0_4px_12px_rgba(21,75,226,0.12)] ring-1 ring-[#154be2]/15 font-bold" : "text-[#8E94B7] hover:bg-white/40 hover:text-[#181a2c]"}`}
             >
               <span
-                className={`material-symbols-outlined ml-0 lg:ml-4 ${activeTab === "summary" ? "font-normal" : ""}`}
+                className={`material-symbols-outlined ml-0 lg:ml-4 ${activeTab === "cdp" ? "font-normal" : ""}`}
               >
-                donut_large
+                hub
               </span>
               <span className={`font-semibold text-xs hidden ${isSidebarExpanded ? "lg:block" : ""}`}>
-                Stock Summary
+                CDP
               </span>
             </button>
           )}
 
-          {showPogTab && (
+          {showTrackingTab && (
             <button
-              onClick={() => setActiveTab("pog")}
-              className={`flex items-center justify-center lg:justify-start gap-3 h-13 rounded-xl transition-all ${activeTab === "pog" ? "bg-[#154be2]/15 text-[#154be2] shadow-[0_4px_12px_rgba(21,75,226,0.12)] ring-1 ring-[#154be2]/15 font-bold" : "text-[#8E94B7] hover:bg-white/40 hover:text-[#181a2c]"}`}
+              onClick={() => setActiveTab("tracking")}
+              className={`flex items-center justify-center lg:justify-start gap-3 h-13 rounded-xl transition-all ${activeTab === "tracking" ? "bg-[#154be2]/15 text-[#154be2] shadow-[0_4px_12px_rgba(21,75,226,0.12)] ring-1 ring-[#154be2]/15 font-bold" : "text-[#8E94B7] hover:bg-white/40 hover:text-[#181a2c]"}`}
             >
               <span
-                className={`material-symbols-outlined ml-0 lg:ml-4 ${activeTab === "pog" ? "font-normal" : ""}`}
+                className={`material-symbols-outlined ml-0 lg:ml-4 ${activeTab === "tracking" ? "font-normal" : ""}`}
               >
-                trending_up
+                route
               </span>
               <span className={`font-semibold text-xs hidden ${isSidebarExpanded ? "lg:block" : ""}`}>
-                POG Tracking
+                Tracking
               </span>
             </button>
           )}
@@ -16267,6 +16829,26 @@ export default function App() {
               </button>
             )}
 
+            {showOverviewV2Tab && (
+              <button
+                onClick={() => setActiveTab("overview_v2")}
+                className={`flex flex-col items-center justify-center h-11 px-2.5 rounded-xl transition-all duration-200 select-none ${
+                  activeTab === "overview_v2"
+                    ? "bg-[#154be2]/12 text-[#154be2] font-extrabold"
+                    : "text-[#8E94B7] hover:text-[#181a2c]"
+                }`}
+              >
+                <span
+                  className={`material-symbols-outlined text-[18px] leading-tight ${activeTab === "overview_v2" ? "font-semibold" : ""}`}
+                >
+                  analytics
+                </span>
+                <span className="text-[7.5px] font-bold uppercase tracking-wider leading-none mt-0.5">
+                  Overview V2
+                </span>
+              </button>
+            )}
+
             {showPartnerTab && (
               <button
                 onClick={() => setActiveTab("partner")}
@@ -16287,42 +16869,42 @@ export default function App() {
               </button>
             )}
 
-            {showStockTab && (
+            {showCdpTab && (
               <button
-                onClick={() => setActiveTab("summary")}
+                onClick={() => setActiveTab("cdp")}
                 className={`flex flex-col items-center justify-center h-11 px-2.5 rounded-xl transition-all duration-200 select-none ${
-                  activeTab === "summary"
+                  activeTab === "cdp"
                     ? "bg-[#154be2]/12 text-[#154be2] font-extrabold"
                     : "text-[#8E94B7] hover:text-[#181a2c]"
                 }`}
               >
                 <span
-                  className={`material-symbols-outlined text-[18px] leading-tight ${activeTab === "summary" ? "font-semibold" : ""}`}
+                  className={`material-symbols-outlined text-[18px] leading-tight ${activeTab === "cdp" ? "font-semibold" : ""}`}
                 >
-                  donut_large
+                  hub
                 </span>
                 <span className="text-[7.5px] font-bold uppercase tracking-wider leading-none mt-0.5">
-                  Stock
+                  CDP
                 </span>
               </button>
             )}
 
-            {showPogTab && (
+            {showTrackingTab && (
               <button
-                onClick={() => setActiveTab("pog")}
+                onClick={() => setActiveTab("tracking")}
                 className={`flex flex-col items-center justify-center h-11 px-2.5 rounded-xl transition-all duration-200 select-none ${
-                  activeTab === "pog"
+                  activeTab === "tracking"
                     ? "bg-[#154be2]/12 text-[#154be2] font-extrabold"
                     : "text-[#8E94B7] hover:text-[#181a2c]"
                 }`}
               >
                 <span
-                  className={`material-symbols-outlined text-[18px] leading-tight ${activeTab === "pog" ? "font-semibold" : ""}`}
+                  className={`material-symbols-outlined text-[18px] leading-tight ${activeTab === "tracking" ? "font-semibold" : ""}`}
                 >
-                  trending_up
+                  route
                 </span>
                 <span className="text-[7.5px] font-bold uppercase tracking-wider leading-none mt-0.5">
-                  POG
+                  Tracking
                 </span>
               </button>
             )}
@@ -16425,6 +17007,116 @@ export default function App() {
           </span>
         </button>
       )}
+    </div>
+  );
+}
+
+interface CurvedProgressIndicatorProps {
+  pct: number;
+  index?: number;
+}
+
+export function CurvedProgressIndicator({ pct, index = 0 }: CurvedProgressIndicatorProps) {
+  const [animatedPct, setAnimatedPct] = React.useState(0);
+  const lastPctRef = React.useRef(0);
+
+  React.useEffect(() => {
+    let animationFrameId: number;
+    const startTime = performance.now();
+    const duration = 1000; // 1 second animation duration
+    const startValue = lastPctRef.current;
+    const endValue = pct;
+
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Smooth cubic easing
+      const ease = 1 - Math.pow(1 - progress, 3);
+      const nextValue = startValue + (endValue - startValue) * ease;
+      
+      setAnimatedPct(nextValue);
+
+      if (progress < 1) {
+        animationFrameId = requestAnimationFrame(animate);
+      } else {
+        lastPctRef.current = endValue;
+      }
+    };
+
+    animationFrameId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [pct]);
+
+  return (
+    <div className="absolute right-0 top-0 bottom-0 w-[90px] xs:w-[105px] sm:w-[115px] md:w-[130px] h-full shrink-0 z-10 overflow-hidden rounded-r-[32px] select-none pointer-events-none">
+      <svg className="size-full" viewBox="0 0 130 110" preserveAspectRatio="none">
+        {/* Right side shaded region */}
+        <path
+          d="M 72,0 A 62,62 0 0,0 72,110 L 130,110 L 130,0 Z"
+          fill="rgba(255,255,255,0.18)"
+        />
+        {/* Curved divider line */}
+        <path
+          d="M 72,0 A 62,62 0 0,0 72,110"
+          fill="none"
+          stroke="rgba(255,255,255,0.45)"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+        {/* Pulsing & Moving Indicator Dot Group */}
+        <g>
+          {/* Pulsing wave ring with enlarged radius */}
+          <circle
+            cx="0"
+            cy="0"
+            r="3.5"
+            fill="white"
+          >
+            <animate
+              attributeName="r"
+              values="3.5;15;3.5"
+              dur="4.5s"
+              begin={`${index * -1.5}s`}
+              repeatCount="indefinite"
+            />
+            <animate
+              attributeName="opacity"
+              values="0.8;0;0.8"
+              dur="4.5s"
+              begin={`${index * -1.5}s`}
+              repeatCount="indefinite"
+            />
+          </circle>
+          {/* Main solid knob indicator */}
+          <circle
+            cx="0"
+            cy="0"
+            r="3.5"
+            fill="white"
+          />
+          {/* Continuous movement along the circular arc with slower speed and offset delay */}
+          <animateMotion
+            dur="10s"
+            begin={`${index * -3.3}s`}
+            repeatCount="indefinite"
+            path="M 72,0 A 62,62 0 0,0 72,110"
+            keyPoints="0;1;0"
+            keyTimes="0;0.5;1"
+            calcMode="spline"
+            keySplines="0.42, 0, 0.58, 1; 0.42, 0, 0.58, 1"
+          />
+        </g>
+      </svg>
+      {/* HTML-rendered Percentage Text to avoid any SVG stretching/distortion */}
+      <div className="absolute left-[68%] -translate-x-1/2 top-1/2 -translate-y-1/2 flex items-baseline text-white">
+        <span className="font-sans font-black text-[17px] xs:text-[20px] sm:text-[22px] md:text-[23px] tracking-tight leading-none">
+          {Math.round(animatedPct)}
+        </span>
+        <span className="font-sans font-black text-[10px] xs:text-[12px] sm:text-[13px] md:text-[14px] leading-none ml-px opacity-90">
+          %
+        </span>
+      </div>
     </div>
   );
 }
