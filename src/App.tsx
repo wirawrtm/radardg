@@ -30,6 +30,11 @@ import {
   LineChart,
   Line,
   LabelList,
+  ScatterChart,
+  Scatter,
+  ZAxis,
+  ReferenceLine,
+  ReferenceArea,
 } from "recharts";
 
 
@@ -2299,6 +2304,14 @@ const Dashboard = ({
   const [partnerSegmentDimension, setPartnerSegmentDimension] = useState<
     "area" | "province" | "sales_agronomist" | "hybrid" | "activity"
   >("area");
+
+  // Dimension filter for Overview V2 Bubble Chart (Activity vs Territory)
+  const [bubbleDimension, setBubbleDimension] = useState<"activity" | "territory">("activity");
+  const [activeBubbleKey, setActiveBubbleKey] = useState<string | null>(null);
+  const [bubbleSearchQuery, setBubbleSearchQuery] = useState("");
+  const [bubbleTableSortField, setBubbleTableSortField] = useState<"name" | "x" | "y" | "actualReach" | "actualActivity" | "actualNominal">("y");
+  const [bubbleTableSortOrder, setBubbleTableSortOrder] = useState<"asc" | "desc">("desc");
+  const [showBubbleTable, setShowBubbleTable] = useState(true);
 
   // Dynamic parameters for Overview Bar Chart
   const isMovement = overviewMetricFilter === "movement";
@@ -5299,6 +5312,28 @@ const Dashboard = ({
       { key: "2027-03", label: "Mar 27", prop: "mar", monthIdx: 2, year: 2027 },
     ];
 
+    const dummyDataByMonth: Record<string, {
+      budgetActivity: number;
+      actualActivity: number;
+      budgetNominal: number;
+      actualNominal: number;
+      budgetReach: number;
+      actualReach: number;
+    }> = {
+      "2026-04": { budgetActivity: 32, actualActivity: 30, budgetNominal: 48000000, actualNominal: 45000000, budgetReach: 1280, actualReach: 1200 },
+      "2026-05": { budgetActivity: 45, actualActivity: 42, budgetNominal: 67500000, actualNominal: 63000000, budgetReach: 1800, actualReach: 1680 },
+      "2026-06": { budgetActivity: 55, actualActivity: 52, budgetNominal: 82500000, actualNominal: 78000000, budgetReach: 2200, actualReach: 2080 },
+      "2026-07": { budgetActivity: 60, actualActivity: 58, budgetNominal: 90000000, actualNominal: 87000000, budgetReach: 2400, actualReach: 2320 },
+      "2026-08": { budgetActivity: 50, actualActivity: 47, budgetNominal: 75000000, actualNominal: 70500000, budgetReach: 2000, actualReach: 1880 },
+      "2026-09": { budgetActivity: 42, actualActivity: 39, budgetNominal: 63000000, actualNominal: 58500000, budgetReach: 1680, actualReach: 1560 },
+      "2026-10": { budgetActivity: 48, actualActivity: 44, budgetNominal: 72000000, actualNominal: 66000000, budgetReach: 1920, actualReach: 1760 },
+      "2026-11": { budgetActivity: 35, actualActivity: 32, budgetNominal: 52500000, actualNominal: 48000000, budgetReach: 1400, actualReach: 1280 },
+      "2026-12": { budgetActivity: 28, actualActivity: 25, budgetNominal: 42000000, actualNominal: 37500000, budgetReach: 1120, actualReach: 1000 },
+      "2027-01": { budgetActivity: 40, actualActivity: 37, budgetNominal: 60000000, actualNominal: 55500000, budgetReach: 1600, actualReach: 1480 },
+      "2027-02": { budgetActivity: 48, actualActivity: 45, budgetNominal: 72000000, actualNominal: 67500000, budgetReach: 1920, actualReach: 1800 },
+      "2027-03": { budgetActivity: 52, actualActivity: 49, budgetNominal: 78000000, actualNominal: 73500000, budgetReach: 2080, actualReach: 1960 },
+    };
+
     const monthlyMap: Record<
       string,
       {
@@ -5319,21 +5354,29 @@ const Dashboard = ({
       }
     > = {};
     monthsSequence.forEach((item) => {
+      const dummy = dummyDataByMonth[item.key] || {
+        budgetActivity: 30,
+        actualActivity: 28,
+        budgetNominal: 45000000,
+        actualNominal: 42000000,
+        budgetReach: 1200,
+        actualReach: 1100,
+      };
       monthlyMap[item.key] = {
         monthKey: item.key,
         monthLabel: item.label,
         name: item.label,
-        opening: 0,
-        ending: 0,
-        stockIn: 0,
-        idle: 0,
-        pog: 0,
-        budgetActivity: 0,
-        actualActivity: 0,
-        budgetNominal: 0,
-        actualNominal: 0,
-        budgetReach: 0,
-        actualReach: 0,
+        opening: 100,
+        ending: 100,
+        stockIn: 50,
+        idle: 20,
+        pog: 50,
+        budgetActivity: dummy.budgetActivity,
+        actualActivity: dummy.actualActivity,
+        budgetNominal: dummy.budgetNominal,
+        actualNominal: dummy.actualNominal,
+        budgetReach: dummy.budgetReach,
+        actualReach: dummy.actualReach,
       };
     });
 
@@ -6236,6 +6279,317 @@ const Dashboard = ({
     overviewSortField,
     overviewSortOrder,
   ]);
+
+  // Memoized data for Overview V2 Bubble Chart Efficiency Matrix
+  const bubbleChartData = useMemo(() => {
+    const labelOffsets = [
+      { dx: 0, dy: -20, anchor: "middle" },   // top
+      { dx: 0, dy: 22, anchor: "middle" },    // bottom
+      { dx: 26, dy: 3, anchor: "start" },     // right
+      { dx: -26, dy: 3, anchor: "end" },      // left
+      { dx: 20, dy: -16, anchor: "start" },   // top-right
+      { dx: -20, dy: 16, anchor: "end" },     // bottom-left
+      { dx: -20, dy: -16, anchor: "end" },    // top-left
+      { dx: 20, dy: 16, anchor: "start" },    // bottom-right
+    ];
+
+    let rawList: any[] = [];
+
+    if (bubbleDimension === "activity") {
+      const activities = [
+        { code: "FFD", fullName: "Farmer Field Day" },
+        { code: "FM", fullName: "Farmers Meeting" },
+        { code: "ODP", fullName: "Open Demo Plot" },
+        { code: "SFT", fullName: "Small Field Trial" },
+        { code: "BFFD", fullName: "Big Farmer Field Day" },
+        { code: "BFM", fullName: "Big Farmers Meeting" },
+        { code: "EXP", fullName: "Expo & Exhibition" },
+        { code: "CRV", fullName: "Caravan Roadshow" },
+        { code: "PT", fullName: "Product Trial" },
+      ];
+
+      rawList = activities.map((act, idx) => {
+        const charSum = act.fullName.split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+        const seed = (charSum + idx * 37) % 100;
+
+        const budgetActivity = 25 + (seed % 45);
+        const actualActivity = Math.round(budgetActivity * (0.8 + (seed % 35) / 100));
+
+        const budgetReach = budgetActivity * (35 + (seed % 20));
+        const actualReach = Math.round(actualActivity * (30 + ((seed + 7) % 40)));
+
+        const budgetNominal = budgetActivity * (3500000 + (seed % 20) * 120000);
+        const actualNominal = Math.round(budgetNominal * (0.85 + (seed % 28) / 100));
+
+        const reachPct = (actualReach / Math.max(1, budgetReach)) * 100;
+        const activityPct = (actualActivity / Math.max(1, budgetActivity)) * 100;
+        const nominalPct = (actualNominal / Math.max(1, budgetNominal)) * 100;
+
+        const reachPerAct = Math.round(actualReach / Math.max(1, actualActivity));
+        // Y-axis: Absolute Average Attendance (pengunjung / activity)
+        const yVal = reachPerAct;
+        // X-axis: Cost per Farmer (CPF) in thousands of IDR
+        const xVal = Math.round(actualNominal / Math.max(1, actualReach) / 1000);
+        // Z-axis: Farmer Reach Volume
+        const zVal = actualReach;
+
+        return {
+          name: act.fullName,
+          code: act.code,
+          x: xVal,
+          y: yVal,
+          z: zVal,
+          actualReach,
+          budgetReach,
+          actualActivity,
+          budgetActivity,
+          actualNominal,
+          budgetNominal,
+          reachPct: Math.round(reachPct),
+          activityPct: Math.round(activityPct),
+          nominalPct: Math.round(nominalPct),
+          reachPerAct,
+          costPerReach: Math.round(actualNominal / Math.max(1, actualReach)),
+        };
+      });
+    } else {
+      const territories = [
+        { code: "T1", fullName: "Area 1 - Jawa Timur" },
+        { code: "T2", fullName: "Area 2 - Jawa Tengah" },
+        { code: "T3", fullName: "Area 3 - Jawa Barat" },
+        { code: "T4", fullName: "Area 4 - Sumatera Utara & Barat" },
+        { code: "T5", fullName: "Area 5 - Sulawesi & Gorontalo" },
+        { code: "T6", fullName: "Area 6 - NTB & Lampung" },
+        { code: "T7", fullName: "Area 7 - Kalimantan & Papua" },
+      ];
+
+      rawList = territories.map((ter, idx) => {
+        const charSum = ter.fullName.split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+        const seed = (charSum + idx * 53) % 100;
+
+        const budgetActivity = 65 + (seed % 85);
+        const actualActivity = Math.round(budgetActivity * (0.82 + (seed % 35) / 100));
+
+        const budgetReach = budgetActivity * (35 + (seed % 20));
+        const actualReach = Math.round(actualActivity * (30 + ((seed + 11) % 40)));
+
+        const budgetNominal = budgetActivity * (4200000 + (seed % 25) * 150000);
+        const actualNominal = Math.round(budgetNominal * (0.85 + (seed % 30) / 100));
+
+        const reachPct = (actualReach / Math.max(1, budgetReach)) * 100;
+        const activityPct = (actualActivity / Math.max(1, budgetActivity)) * 100;
+        const nominalPct = (actualNominal / Math.max(1, budgetNominal)) * 100;
+
+        const reachPerAct = Math.round(actualReach / Math.max(1, actualActivity));
+        const yVal = reachPerAct;
+        // X-axis: Cost per Farmer (CPF) in thousands of IDR
+        const xVal = Math.round(actualNominal / Math.max(1, actualReach) / 1000);
+        const zVal = actualReach;
+
+        return {
+          name: ter.fullName,
+          code: ter.code,
+          x: xVal,
+          y: yVal,
+          z: zVal,
+          actualReach,
+          budgetReach,
+          actualActivity,
+          budgetActivity,
+          actualNominal,
+          budgetNominal,
+          reachPct: Math.round(reachPct),
+          activityPct: Math.round(activityPct),
+          nominalPct: Math.round(nominalPct),
+          reachPerAct,
+          costPerReach: Math.round(actualNominal / Math.max(1, actualReach)),
+        };
+      });
+    }
+
+    // Process rawList to assign non-overlapping label offsets using 2D pixel collision algorithm
+    const candidateOffsets = [
+      { dx: 0, dy: -32 },     // Top
+      { dx: 0, dy: 32 },      // Bottom
+      { dx: 45, dy: 0 },      // Right
+      { dx: -45, dy: 0 },     // Left
+      { dx: 36, dy: -26 },    // Top-Right
+      { dx: -36, dy: -26 },   // Top-Left
+      { dx: 36, dy: 26 },     // Bottom-Right
+      { dx: -36, dy: 26 },    // Bottom-Left
+      { dx: 0, dy: -48 },     // Far Top
+      { dx: 0, dy: 48 },      // Far Bottom
+      { dx: 58, dy: -14 },    // Far Right-Top
+      { dx: -58, dy: -14 },   // Far Left-Top
+      { dx: 58, dy: 14 },     // Far Right-Bottom
+      { dx: -58, dy: 14 },    // Far Left-Bottom
+      { dx: 24, dy: -44 },    // High Top-Right
+      { dx: -24, dy: -44 },   // High Top-Left
+      { dx: 24, dy: 44 },     // Low Bottom-Right
+      { dx: -24, dy: 44 },    // Low Bottom-Left
+      { dx: 72, dy: 0 },      // Extended Right
+      { dx: -72, dy: 0 },     // Extended Left
+    ];
+
+    // Estimate pixel coordinates of all bubbles on the chart (chart area width ~ 700px, height ~ 360px)
+    // Domain X: [45, 155] (span 110), Domain Y: [10, 90] (span 80, centered at 50)
+    const bubblePixels = rawList.map((item) => ({
+      ...item,
+      pixelX: 45 + ((item.x - 45) / 110) * 700,
+      pixelY: 25 + ((90 - item.y) / 80) * 360,
+    }));
+
+    const assignedPills: Array<{
+      left: number;
+      right: number;
+      top: number;
+      bottom: number;
+    }> = [];
+
+    return bubblePixels.map((item, idx) => {
+      const cleanName = item.name.replace(/^Area \d+ - /, "");
+      const labelText = item.code ? (cleanName ? `${item.code} - ${cleanName}` : item.code) : item.name;
+      const pillW = Math.max(34, labelText.length * 5.8 + 12);
+      const pillH = 18;
+
+      let bestCandidate = candidateOffsets[0];
+      let minPenalty = Infinity;
+
+      candidateOffsets.forEach((cand) => {
+        let penalty = 0;
+
+        const candCenterX = item.pixelX + cand.dx;
+        const candCenterY = item.pixelY + cand.dy;
+
+        const candLeft = candCenterX - pillW / 2;
+        const candRight = candCenterX + pillW / 2;
+        const candTop = candCenterY - pillH / 2;
+        const candBottom = candCenterY + pillH / 2;
+
+        // Penalty for going off chart edges (chart bounds: X ~ 15..775, Y ~ 10..385)
+        if (candLeft < 15) penalty += (15 - candLeft) * 20;
+        if (candRight > 775) penalty += (candRight - 775) * 20;
+        if (candTop < 10) penalty += (10 - candTop) * 20;
+        if (candBottom > 385) penalty += (candBottom - 385) * 20;
+
+        // Penalty for overlapping ANY bubble center
+        bubblePixels.forEach((other, oIdx) => {
+          if (oIdx === idx) return;
+          const dist = Math.hypot(candCenterX - other.pixelX, candCenterY - other.pixelY);
+          if (dist < 24) {
+            penalty += (24 - dist) * 30;
+          }
+        });
+
+        // Penalty for overlapping previously placed pill labels
+        assignedPills.forEach((prev) => {
+          const overlapX = !(candRight < prev.left - 4 || candLeft > prev.right + 4);
+          const overlapY = !(candBottom < prev.top - 4 || candTop > prev.bottom + 4);
+          if (overlapX && overlapY) {
+            penalty += 1000;
+          }
+        });
+
+        // Small penalty for larger offset distance to keep labels close when possible
+        penalty += Math.hypot(cand.dx, cand.dy) * 0.4;
+
+        if (penalty < minPenalty) {
+          minPenalty = penalty;
+          bestCandidate = cand;
+        }
+      });
+
+      const chosenCenterX = item.pixelX + bestCandidate.dx;
+      const chosenCenterY = item.pixelY + bestCandidate.dy;
+
+      assignedPills.push({
+        left: chosenCenterX - pillW / 2,
+        right: chosenCenterX + pillW / 2,
+        top: chosenCenterY - pillH / 2,
+        bottom: chosenCenterY + pillH / 2,
+      });
+
+      return {
+        ...item,
+        labelDx: bestCandidate.dx,
+        labelDy: bestCandidate.dy,
+      };
+    });
+  }, [bubbleDimension]);
+
+  // Group items by Quadrant for the Quadrant Cards below chart
+  const quadrantGroups = useMemo(() => {
+    const q1 = bubbleChartData.filter(item => item.x < 110 && item.y >= 50);
+    const q2 = bubbleChartData.filter(item => item.x >= 110 && item.y >= 50);
+    const q3 = bubbleChartData.filter(item => item.x < 110 && item.y < 50);
+    const q4 = bubbleChartData.filter(item => item.x >= 110 && item.y < 50);
+    return { q1, q2, q3, q4 };
+  }, [bubbleChartData]);
+
+  // Table filtering and sorting for Bubble Chart Matrix Table
+  const filteredSortedBubbleTableData = useMemo(() => {
+    let list = [...bubbleChartData];
+
+    if (bubbleSearchQuery.trim()) {
+      const q = bubbleSearchQuery.toLowerCase();
+      list = list.filter(
+        item => item.name.toLowerCase().includes(q) || item.code.toLowerCase().includes(q)
+      );
+    }
+
+    list.sort((a, b) => {
+      let valA = a[bubbleTableSortField];
+      let valB = b[bubbleTableSortField];
+      if (typeof valA === "string") valA = (valA as string).toLowerCase();
+      if (typeof valB === "string") valB = (valB as string).toLowerCase();
+
+      if (valA < valB) return bubbleTableSortOrder === "asc" ? -1 : 1;
+      if (valA > valB) return bubbleTableSortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    return list;
+  }, [bubbleChartData, bubbleSearchQuery, bubbleTableSortField, bubbleTableSortOrder]);
+
+  // Totals for Bubble Chart Matrix Table
+  const bubbleTableTotals = useMemo(() => {
+    if (!bubbleChartData.length) return null;
+
+    const totalActualReach = bubbleChartData.reduce((acc, curr) => acc + curr.actualReach, 0);
+    const totalBudgetReach = bubbleChartData.reduce((acc, curr) => acc + curr.budgetReach, 0);
+
+    const totalActualActivity = bubbleChartData.reduce((acc, curr) => acc + curr.actualActivity, 0);
+    const totalBudgetActivity = bubbleChartData.reduce((acc, curr) => acc + curr.budgetActivity, 0);
+
+    const totalActualNominal = bubbleChartData.reduce((acc, curr) => acc + curr.actualNominal, 0);
+    const totalBudgetNominal = bubbleChartData.reduce((acc, curr) => acc + curr.budgetNominal, 0);
+
+    const avgX = Math.round(bubbleChartData.reduce((acc, curr) => acc + curr.x, 0) / bubbleChartData.length);
+    const avgY = Math.round(bubbleChartData.reduce((acc, curr) => acc + curr.y, 0) / bubbleChartData.length);
+
+    const reachPct = Math.round((totalActualReach / Math.max(1, totalBudgetReach)) * 100);
+    const activityPct = Math.round((totalActualActivity / Math.max(1, totalBudgetActivity)) * 100);
+    const nominalPct = Math.round((totalActualNominal / Math.max(1, totalBudgetNominal)) * 100);
+
+    const reachPerAct = Math.round(totalActualReach / Math.max(1, totalActualActivity));
+    const costPerReach = Math.round(totalActualNominal / Math.max(1, totalActualReach));
+
+    return {
+      totalActualReach,
+      totalBudgetReach,
+      reachPct,
+      totalActualActivity,
+      totalBudgetActivity,
+      activityPct,
+      totalActualNominal,
+      totalBudgetNominal,
+      nominalPct,
+      avgX,
+      avgY,
+      reachPerAct,
+      costPerReach,
+    };
+  }, [bubbleChartData]);
 
   const topKiosksData = useMemo(() => {
     const kioskSales: Record<
@@ -10022,17 +10376,17 @@ const Dashboard = ({
                         }
                       });
 
-                      const activeIndex = clickedPieIndex !== null ? clickedPieIndex : largestSubIndex;
+                      const activeIndex = clickedPieIndex !== null ? clickedPieIndex : (largestSubIndex >= 0 ? largestSubIndex : 0);
 
                       const windowWidth = typeof window !== "undefined" ? window.innerWidth : 1200;
                       const isMobile = windowWidth < 640;
                       const isTablet = windowWidth >= 640 && windowWidth < 1024;
                       const currentMargin = isMobile
-                        ? { top: 12, right: 30, left: 30, bottom: 12 }
+                        ? { top: 22, right: 30, left: 30, bottom: 22 }
                         : isTablet
-                          ? { top: 18, right: 45, left: 45, bottom: 18 }
-                          : { top: 25, right: 65, left: 65, bottom: 25 };
-                      const currentOuterRadius = isMobile ? 48 : isTablet ? 72 : 105;
+                          ? { top: 32, right: 45, left: 45, bottom: 32 }
+                          : { top: 42, right: 65, left: 65, bottom: 42 };
+                      const currentOuterRadius = isMobile ? 42 : isTablet ? 64 : 92;
 
                       return (
                         <div className="flex flex-col h-full min-h-[220px] lg:min-h-[260px] gap-1 relative">
@@ -10073,7 +10427,7 @@ const Dashboard = ({
                           </div>
 
                           <div className="w-full h-[180px] sm:h-[210px] lg:h-[290px] relative">
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer key={`sub-pie-container-${activeIndex}-${subData.length}`} width="100%" height="100%">
                               <PieChart margin={currentMargin}>
                                 <Pie
                                   data={subData}
@@ -10114,6 +10468,7 @@ const Dashboard = ({
                                           startAngle={startAngle}
                                           endAngle={endAngle}
                                           fill={fill}
+                                          cornerRadius={8}
                                         />
                                       </g>
                                     );
@@ -10939,7 +11294,7 @@ const Dashboard = ({
                             <button
                               key={card.key}
                               onClick={() => setOverviewSubFilter(card.key as any)}
-                              className={`rounded-[32px] flex flex-row items-center justify-between relative overflow-hidden group transition-all duration-300 w-full text-left cursor-pointer border-0 py-4 xs:py-5 sm:py-6 pl-3.5 xs:pl-4 sm:pl-5 pr-[60px] xs:pr-[75px] sm:pr-[110px] lg:pr-[125px] ${activeTab === "overview_v2" ? "col-span-1 h-full" : "lg:flex-1 lg:min-h-0"} min-h-[100px] xs:min-h-[110px] ${cardStyle} ${shadowStyle}`}
+                              className={`rounded-[20px] sm:rounded-[24px] flex flex-row items-center justify-between relative overflow-hidden group transition-all duration-300 w-full text-left cursor-pointer border-0 py-2 xs:py-2.5 sm:py-3 pl-3.5 xs:pl-4 sm:pl-5 pr-[50px] xs:pr-[65px] sm:pr-[95px] lg:pr-[105px] ${activeTab === "overview_v2" ? "col-span-1 h-full" : "lg:flex-1 lg:min-h-0"} min-h-[70px] xs:min-h-[80px] sm:min-h-[88px] ${cardStyle} ${shadowStyle}`}
                             >
                               <div className="flex flex-col justify-center z-10 min-w-0 flex-1 pr-1">
                                 {activeTab !== "overview_v2" && (
@@ -10949,17 +11304,17 @@ const Dashboard = ({
                                     </span>
                                   </div>
                                 )}
-                                <h4 className="text-[10px] xs:text-[12px] sm:text-[14.5px] font-black leading-tight sm:leading-snug text-white break-words whitespace-normal">
+                                <h4 className="text-[10.5px] xs:text-[12.5px] sm:text-[14.5px] font-black leading-tight sm:leading-snug text-white break-words whitespace-normal">
                                   {card.subtitle}
                                 </h4>
-                                <div className="mt-1.5 xs:mt-2 flex flex-col items-start gap-0.5 xs:gap-1">
-                                  <div className="flex flex-wrap items-center gap-0.5 xs:gap-1 font-sans font-black text-[9px] xs:text-[11px] sm:text-[13px] text-white">
-                                    <span>{card.actualStr}</span>
-                                    <span className="text-white/40">/</span>
-                                    <span className="font-sans font-extrabold text-[8.5px] xs:text-[10.5px] sm:text-[12.5px] text-white/80">{card.budgetStr}</span>
+                                <div className="mt-1 xs:mt-1.5 flex flex-col items-start gap-0.5 xs:gap-1">
+                                  <div className="flex flex-wrap items-baseline gap-1 font-sans text-white">
+                                    <span className="text-[12.5px] xs:text-[15.5px] sm:text-[20.5px] font-black tracking-tight leading-none">{card.actualStr}</span>
+                                    <span className="text-white/40 text-[9px] xs:text-[11px] sm:text-[13px] font-bold">/</span>
+                                    <span className="text-[9.5px] xs:text-[11.5px] sm:text-[14px] font-extrabold text-white/80 leading-none">{card.budgetStr}</span>
                                   </div>
-                                  <div className="mt-0.5 xs:mt-1">
-                                    <span className="px-1 xs:px-1.5 py-0.5 rounded text-[8px] xs:text-[9.5px] sm:text-[11px] font-black bg-white/20 text-white border border-white/10">
+                                  <div className="mt-0.5">
+                                    <span className="px-1 xs:px-1.5 py-0.5 rounded text-[8.5px] xs:text-[10px] sm:text-[11.5px] font-black bg-white/20 text-white border border-white/10">
                                       {displayGapStr}
                                     </span>
                                   </div>
@@ -10978,23 +11333,23 @@ const Dashboard = ({
                           <>
                             {/* Desktop Layout */}
                             <div className="hidden lg:grid w-full lg:grid-cols-[auto_1fr_1fr_1fr] gap-2 lg:gap-3 items-stretch">
-                              <div className="flex items-center justify-end pr-0 w-[130px] xl:w-[160px]">
+                              <div className="flex items-center justify-end pr-0 w-[100px] xl:w-[115px]">
                                 <img
                                   src="https://lh3.googleusercontent.com/d/1A0MkFXGsBDmXt67z5uED_jpVQ2QdXUdl=w1000"
-                                  className="w-full h-auto max-h-[160px] xl:max-h-[180px] object-contain object-right drop-shadow-md"
+                                  className="w-full h-auto max-h-[105px] xl:max-h-[115px] object-contain object-right drop-shadow-md"
                                   alt="Jagoan Advanta"
                                 />
                               </div>
                               {renderedCards}
                             </div>
                             {/* Mobile / Tablet Layout */}
-                            <div className="w-full flex flex-col gap-3 sm:gap-4 lg:hidden">
+                            <div className="w-full flex flex-col gap-2.5 sm:gap-3 lg:hidden">
                               {/* Row 1: Icon Jagoan + Total Kegiatan Card */}
-                              <div className="w-full flex flex-row gap-2 sm:gap-3 items-stretch">
-                                <div className="flex items-center justify-center shrink-0 bg-white border border-slate-100 shadow-sm rounded-[32px] p-2 w-[85px] xs:w-[100px] sm:w-[120px]">
+                              <div className="w-full flex flex-row gap-2 sm:gap-2.5 items-stretch">
+                                <div className="flex items-center justify-center shrink-0 bg-white border border-slate-100 shadow-sm rounded-[20px] sm:rounded-[24px] p-1.5 w-[65px] xs:w-[80px] sm:w-[95px]">
                                   <img
                                     src="https://lh3.googleusercontent.com/d/1A0MkFXGsBDmXt67z5uED_jpVQ2QdXUdl=w1000"
-                                    className="w-full h-auto max-h-[85px] xs:max-h-[100px] object-contain drop-shadow-md"
+                                    className="w-full h-auto max-h-[55px] xs:max-h-[65px] sm:max-h-[75px] object-contain drop-shadow-md"
                                     alt="Jagoan Advanta"
                                   />
                                 </div>
@@ -11003,7 +11358,7 @@ const Dashboard = ({
                                 </div>
                               </div>
                               {/* Row 2: Total Anggaran + Farmer Reach Cards */}
-                              <div className="w-full grid grid-cols-2 gap-2 sm:gap-3 items-stretch">
+                              <div className="w-full grid grid-cols-2 gap-2 sm:gap-2.5 items-stretch">
                                 <div className="min-w-0">
                                   {renderedCards[1]}
                                 </div>
@@ -11155,7 +11510,710 @@ const Dashboard = ({
             </div>
           </div>
 
-                                                  {/* Section: Conversion Sales Rate */}
+                                                  {/* Section: Overview V2 - Bubble Chart Matrix Efficiency */}
+          {activeTab === "overview_v2" && (
+            <div className="bg-white p-5 sm:p-7 rounded-[40px] shadow-[0_12px_32px_rgba(21,75,226,0.18)] border border-[#154be2]/10 mt-6 mb-6 flex flex-col gap-5">
+              {/* Header & Controls */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[#f0effc]">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[#154be2] text-xl font-bold bg-[#154be2]/10 p-1.5 rounded-xl">
+                      bubble_chart
+                    </span>
+                    <h3 className="text-base font-black text-[#181a2c] tracking-tight">
+                      Matrix Efficiency Ratio (Bubble Chart)
+                    </h3>
+                    <span className="text-[10px] font-extrabold text-[#154be2] bg-[#154be2]/10 px-2 py-0.5 rounded-full uppercase">
+                      Overview V2
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#8E94B7] mt-1 font-medium">
+                    Analisis perbandingan <strong className="text-slate-700">Average Attendance (Pengunjung / Event)</strong> dan <strong className="text-slate-700">Cost per Farmer (CPF)</strong>.
+                  </p>
+                </div>
+
+                {/* Picklist Controls: Activity & Territory */}
+                <div className="flex items-center gap-2 self-start md:self-auto shrink-0 bg-[#fbfaff] p-1.5 rounded-2xl border border-[#e2e8f0]">
+                  <span className="text-[10px] font-bold text-[#8E94B7] uppercase px-2 select-none">
+                    Dimensi:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBubbleDimension("activity");
+                      setActiveBubbleKey(null);
+                    }}
+                    className={`px-4 py-2 rounded-xl text-xs font-black transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${
+                      bubbleDimension === "activity"
+                        ? "bg-[#154be2] text-white shadow-[0_4px_14px_rgba(21,75,226,0.3)] scale-[1.02]"
+                        : "text-[#8E94B7] hover:text-[#181a2c] hover:bg-white"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">event_note</span>
+                    <span>Activity</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBubbleDimension("territory");
+                      setActiveBubbleKey(null);
+                    }}
+                    className={`px-4 py-2 rounded-xl text-xs font-black transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${
+                      bubbleDimension === "territory"
+                        ? "bg-[#154be2] text-white shadow-[0_4px_14px_rgba(21,75,226,0.3)] scale-[1.02]"
+                        : "text-[#8E94B7] hover:text-[#181a2c] hover:bg-white"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">map</span>
+                    <span>Territory</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Main Chart Section with Legend on Right */}
+              <div className="flex flex-col lg:flex-row gap-4 items-stretch font-sans pt-2">
+                {/* Main Chart Container */}
+                <div className="flex-1 min-w-0 h-[400px] sm:h-[450px] relative">
+                  {activeBubbleKey && (() => {
+                    const activeBubbleData = bubbleChartData.find((item: any) => item.name === activeBubbleKey);
+                    if (!activeBubbleData) return null;
+                    const color = getBubbleQuadrantColor(activeBubbleData.x, activeBubbleData.y);
+                    
+                    let quadText = "";
+                    if (activeBubbleData.x < 110 && activeBubbleData.y >= 50) quadText = "🌟 Kuadran I • High Performer";
+                    else if (activeBubbleData.x >= 110 && activeBubbleData.y >= 50) quadText = "⚡ Kuadran II • High Attendance";
+                    else if (activeBubbleData.x < 110 && activeBubbleData.y < 50) quadText = "💡 Kuadran III • Cost Efficient";
+                    else quadText = "⚠️ Kuadran IV • Need Review";
+
+                    return (
+                      <div className="absolute right-3 top-3 bg-white/95 backdrop-blur-md p-3.5 rounded-2xl shadow-[0_12px_28px_rgba(21,75,226,0.22)] border-2 border-[#154be2] text-[10.5px] w-[240px] font-sans text-[#181a2c] z-50 select-text animate-in fade-in-50 zoom-in-95 duration-200">
+                        {/* Close Button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveBubbleKey(null);
+                          }}
+                          className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5 rounded-full hover:bg-slate-100 flex items-center justify-center size-5 transition-all"
+                          title="Tutup Detail"
+                        >
+                          <span className="material-symbols-outlined text-[13px] font-bold">close</span>
+                        </button>
+
+                        <div className="flex items-center gap-1.5 pb-1 border-b border-slate-100 pr-5">
+                          <div className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                          <span className="font-black truncate text-[11px]">{activeBubbleData.code} - {activeBubbleData.name.replace(/^Area \d+ - /, "")}</span>
+                        </div>
+
+                        <div className="text-[9px] font-black px-1.5 py-0.5 rounded my-1.5 bg-slate-100 text-slate-700 w-fit">
+                          {quadText}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-1.5 text-[9.5px] mb-1.5">
+                          <div className="bg-[#154be2]/5 p-1.5 rounded border border-[#154be2]/10">
+                            <p className="text-[7.5px] text-[#8E94B7] font-bold uppercase">Avg Attendance</p>
+                            <p className="font-black text-[#154be2] mt-0.5">{activeBubbleData.y} orang/event</p>
+                          </div>
+                          <div className="bg-emerald-500/5 p-1.5 rounded border border-emerald-500/10">
+                            <p className="text-[7.5px] text-[#8E94B7] font-bold uppercase">Cost per Farmer (CPF)</p>
+                            <p className="font-black text-emerald-600 mt-0.5">Rp {activeBubbleData.costPerReach.toLocaleString("id-ID")}</p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-0.5 text-[9px] text-slate-600 pt-1.5 border-t border-slate-100 font-medium">
+                          <div className="flex justify-between">
+                            <span>Reach:</span>
+                            <span className="font-black text-slate-800">{activeBubbleData.actualReach.toLocaleString("id-ID")} / {activeBubbleData.budgetReach.toLocaleString("id-ID")} ({activeBubbleData.reachPct}%)</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Activity:</span>
+                            <span className="font-black text-slate-800">{activeBubbleData.actualActivity} / {activeBubbleData.budgetActivity} ({activeBubbleData.activityPct}%)</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Anggaran:</span>
+                            <span className="font-black text-slate-800">Rp {(activeBubbleData.actualNominal / 1000000).toFixed(1)} Jt ({activeBubbleData.nominalPct}%)</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ScatterChart margin={{ top: 25, right: 20, bottom: 25, left: 55 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.8} />
+
+                      {/* Quadrant Background Colors & Titles (Full Coverage) */}
+                      <ReferenceArea
+                        x1={50}
+                        x2={110}
+                        y1={50}
+                        y2={90}
+                        shape={(props: any) => {
+                          const { x, y, width, height } = props;
+                          if (!width || !height) return null;
+                          return (
+                            <g>
+                              <rect
+                                x={x}
+                                y={y}
+                                width={width}
+                                height={height}
+                                fill="#10b981"
+                                fillOpacity={0.08}
+                              />
+                              <text
+                                x={x + width - 10}
+                                y={y + 18}
+                                fill="#059669"
+                                fontSize={10}
+                                fontWeight={800}
+                                textAnchor="end"
+                              >
+                                KUADRAN I • High Performer
+                              </text>
+                            </g>
+                          );
+                        }}
+                      />
+                      <ReferenceArea
+                        x1={110}
+                        x2={180}
+                        y1={50}
+                        y2={90}
+                        shape={(props: any) => {
+                          const { x, y, width, height } = props;
+                          if (!width || !height) return null;
+                          return (
+                            <g>
+                              <rect
+                                x={x}
+                                y={y}
+                                width={width}
+                                height={height}
+                                fill="#154be2"
+                                fillOpacity={0.07}
+                              />
+                              <text
+                                x={x + 10}
+                                y={y + 18}
+                                fill="#154be2"
+                                fontSize={10}
+                                fontWeight={800}
+                                textAnchor="start"
+                              >
+                                KUADRAN II • High Attendance
+                              </text>
+                            </g>
+                          );
+                        }}
+                      />
+                      <ReferenceArea
+                        x1={50}
+                        x2={110}
+                        y1={10}
+                        y2={50}
+                        shape={(props: any) => {
+                          const { x, y, width, height } = props;
+                          if (!width || !height) return null;
+                          return (
+                            <g>
+                              <rect
+                                x={x}
+                                y={y}
+                                width={width}
+                                height={height}
+                                fill="#06b6d4"
+                                fillOpacity={0.08}
+                              />
+                              <text
+                                x={x + width - 10}
+                                y={y + height - 10}
+                                fill="#0891b2"
+                                fontSize={10}
+                                fontWeight={800}
+                                textAnchor="end"
+                              >
+                                KUADRAN III • Cost Efficient
+                              </text>
+                            </g>
+                          );
+                        }}
+                      />
+                      <ReferenceArea
+                        x1={110}
+                        x2={180}
+                        y1={10}
+                        y2={50}
+                        shape={(props: any) => {
+                          const { x, y, width, height } = props;
+                          if (!width || !height) return null;
+                          return (
+                            <g>
+                              <rect
+                                x={x}
+                                y={y}
+                                width={width}
+                                height={height}
+                                fill="#f59e0b"
+                                fillOpacity={0.08}
+                              />
+                              <text
+                                x={x + 10}
+                                y={y + height - 10}
+                                fill="#d97706"
+                                fontSize={10}
+                                fontWeight={800}
+                                textAnchor="start"
+                              >
+                                KUADRAN IV • Need Review
+                              </text>
+                            </g>
+                          );
+                        }}
+                      />
+
+                      <XAxis
+                        type="number"
+                        dataKey="x"
+                        name="Cost per Farmer (CPF)"
+                        reversed={true}
+                        domain={[50, 180]}
+                        tickFormatter={(val) => `Rp ${val}k`}
+                        tick={{ fill: "#64748b", fontSize: 10, fontWeight: 700 }}
+                        axisLine={{ stroke: "#cbd5e1" }}
+                        label={{
+                          value: "Cost per Farmer (CPF) / Pengeluaran per Petani",
+                          position: "bottom",
+                          offset: 10,
+                          style: { fill: "#154be2", fontSize: 10, fontWeight: 800 }
+                        }}
+                      />
+                      <YAxis
+                        type="number"
+                        dataKey="y"
+                        name="Average Attendance"
+                        unit=""
+                        domain={[10, 90]}
+                        width={40}
+                        tick={{ fill: "#64748b", fontSize: 10, fontWeight: 700 }}
+                        axisLine={{ stroke: "#cbd5e1" }}
+                        label={(props: any) => {
+                          const { viewBox } = props;
+                          if (!viewBox) return null;
+                          const centerY = viewBox.y + viewBox.height / 2;
+                          const x = viewBox.x - 38;
+                          return (
+                            <text
+                              x={x}
+                              y={centerY}
+                              fill="#154be2"
+                              fontSize={10}
+                              fontWeight={800}
+                              textAnchor="middle"
+                              transform={`rotate(-90, ${x}, ${centerY})`}
+                            >
+                              Average Attendance (Pengunjung / Event)
+                            </text>
+                          );
+                        }}
+                      />
+                      <ZAxis type="number" dataKey="z" range={[1000, 3000]} name="Total Reach" />
+                      
+
+
+                      {/* Benchmark Target Reference Lines */}
+                      <ReferenceLine
+                        x={110}
+                        stroke="#154be2"
+                        strokeDasharray="4 4"
+                        strokeWidth={1.5}
+                      />
+                      <ReferenceLine
+                        y={50}
+                        stroke="#154be2"
+                        strokeDasharray="4 4"
+                        strokeWidth={1.5}
+                      />
+
+                      <Scatter
+                        data={bubbleChartData}
+                        animationDuration={600}
+                        shape={(props: any) => {
+                          const { cx, cy, size, payload } = props;
+                          if (cx === undefined || cy === undefined || !payload) return null;
+                          const color = getBubbleQuadrantColor(payload.x, payload.y);
+                          const isSelected = activeBubbleKey === payload.name;
+                          // Calculate radius from size: Recharts default size is circle area in pixels (pi * r * r)
+                          // Ensure a healthy radius range
+                          const r = Math.max(12, Math.min(35, Math.sqrt(size / Math.PI))) || 15;
+
+                          return (
+                            <g
+                              className="cursor-pointer transition-all duration-300 hover:scale-110"
+                              onClick={() => setActiveBubbleKey(prev => prev === payload.name ? null : payload.name)}
+                            >
+                              <circle
+                                cx={cx}
+                                cy={cy}
+                                r={r}
+                                fill={color}
+                                fillOpacity={activeBubbleKey ? (isSelected ? 0.95 : 0.25) : 0.8}
+                                stroke={color}
+                                strokeWidth={isSelected ? 3 : 1.5}
+                              />
+                              <text
+                                x={cx}
+                                y={cy}
+                                textAnchor="middle"
+                                dominantBaseline="central"
+                                fill="#ffffff"
+                                fontSize={r > 20 ? 11 : 9}
+                                fontWeight={900}
+                                fontFamily="sans-serif"
+                                style={{
+                                  textShadow: "0px 1.5px 2.5px rgba(0,0,0,0.85), 0px 0px 1.5px rgba(0,0,0,0.95)",
+                                  pointerEvents: "none"
+                                }}
+                              >
+                                {payload.code}
+                              </text>
+                            </g>
+                          );
+                        }}
+                      />
+                    </ScatterChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Right Side Legend: Sorted by Quadrant with Toggle Tooltip */}
+                <div className="w-full lg:w-[280px] xl:w-[320px] shrink-0 bg-[#f8fafc] rounded-2xl p-3.5 flex flex-col justify-between shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
+                  <div>
+                    <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-[#e2e8f0]">
+                      <button
+                        type="button"
+                        onClick={() => setShowBubbleTable(!showBubbleTable)}
+                        className="flex items-center gap-1.5 group cursor-pointer hover:opacity-80 transition-all text-left bg-transparent border-none p-0 outline-none"
+                        title={showBubbleTable ? "Klik untuk Sembunyikan Tabel Angka" : "Klik untuk Tampilkan Tabel Angka"}
+                      >
+                        <span className="material-symbols-outlined text-[#154be2] text-base group-hover:scale-110 transition-transform">
+                          {showBubbleTable ? "visibility" : "visibility_off"}
+                        </span>
+                        <h4 className="text-xs font-black text-[#181a2c] uppercase tracking-wider flex items-center gap-1">
+                          {bubbleDimension === "activity" ? "Acara" : "Territory"}
+                          <span className="text-[8.5px] font-extrabold text-slate-400 normal-case lowercase bg-slate-100 px-1 py-0.5 rounded ml-0.5">
+                            {showBubbleTable ? "Tabel Aktif" : "Tabel Sembunyi"}
+                          </span>
+                        </h4>
+                      </button>
+                      <div className="flex items-center gap-1.5">
+                        {activeBubbleKey && (
+                          <button
+                            type="button"
+                            onClick={() => setActiveBubbleKey(null)}
+                            className="text-[9px] font-bold text-[#154be2] bg-[#154be2]/10 hover:bg-[#154be2]/20 px-2 py-0.5 rounded-md transition-all flex items-center gap-0.5 cursor-pointer"
+                            title="Reset Tooltip"
+                          >
+                            <span>Reset</span>
+                            <span className="material-symbols-outlined text-[10px] font-bold">close</span>
+                          </button>
+                        )}
+                        <span className="text-[10px] font-extrabold bg-[#154be2]/10 text-[#154be2] px-2 py-0.5 rounded-md">
+                          {bubbleChartData.length} Code
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 overflow-y-auto max-h-[380px] pr-0.5 scrollbar-thin">
+                      {[
+                        { id: 1, name: "Kuadran I • High Performer", badgeBg: "bg-emerald-500", items: quadrantGroups.q1 },
+                        { id: 2, name: "Kuadran II • High Attendance", badgeBg: "bg-[#154be2]", items: quadrantGroups.q2 },
+                        { id: 3, name: "Kuadran III • Cost Efficient", badgeBg: "bg-cyan-500", items: quadrantGroups.q3 },
+                        { id: 4, name: "Kuadran IV • Need Review", badgeBg: "bg-amber-500", items: quadrantGroups.q4 },
+                      ].map((quadGroup) => {
+                        if (quadGroup.items.length === 0) return null;
+                        return (
+                          <div key={quadGroup.id} className="space-y-1">
+                            <div className="flex items-center gap-1.5 px-0.5 pt-1">
+                              <div className={`size-2 rounded-full ${quadGroup.badgeBg}`} />
+                              <span className="text-[9.5px] font-black uppercase tracking-wider text-slate-600">
+                                {quadGroup.name}
+                              </span>
+                              <span className="text-[9px] font-bold text-slate-400">({quadGroup.items.length})</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              {quadGroup.items.map((item) => {
+                                const itemKey = item.name;
+                                const isSelected = activeBubbleKey === itemKey;
+
+                                let quadBgClass = "";
+                                let badgeClass = "";
+
+                                if (quadGroup.id === 1) {
+                                  quadBgClass = isSelected
+                                    ? "bg-emerald-600 text-white border-emerald-600 shadow-sm scale-[1.02]"
+                                    : "bg-emerald-50/90 text-emerald-950 border-emerald-200 hover:bg-emerald-100";
+                                  badgeClass = isSelected
+                                    ? "bg-white/20 text-white"
+                                    : "bg-emerald-200/80 text-emerald-800";
+                                } else if (quadGroup.id === 2) {
+                                  quadBgClass = isSelected
+                                    ? "bg-[#154be2] text-white border-[#154be2] shadow-sm scale-[1.02]"
+                                    : "bg-blue-50/90 text-blue-950 border-blue-200 hover:bg-blue-100";
+                                  badgeClass = isSelected
+                                    ? "bg-white/20 text-white"
+                                    : "bg-blue-200/80 text-blue-800";
+                                } else if (quadGroup.id === 3) {
+                                  quadBgClass = isSelected
+                                    ? "bg-cyan-600 text-white border-cyan-600 shadow-sm scale-[1.02]"
+                                    : "bg-cyan-50/90 text-cyan-950 border-cyan-200 hover:bg-cyan-100";
+                                  badgeClass = isSelected
+                                    ? "bg-white/20 text-white"
+                                    : "bg-cyan-200/80 text-cyan-800";
+                                } else {
+                                  quadBgClass = isSelected
+                                    ? "bg-amber-600 text-white border-amber-600 shadow-sm scale-[1.02]"
+                                    : "bg-amber-50/90 text-amber-950 border-amber-200 hover:bg-amber-100";
+                                  badgeClass = isSelected
+                                    ? "bg-white/20 text-white"
+                                    : "bg-amber-200/80 text-amber-800";
+                                }
+
+                                return (
+                                  <button
+                                    key={item.code || item.name}
+                                    type="button"
+                                    onClick={() => setActiveBubbleKey(prev => prev === itemKey ? null : itemKey)}
+                                    className={`flex items-center gap-1.5 p-1.5 px-2 rounded-xl border text-left transition-all duration-200 cursor-pointer ${quadBgClass}`}
+                                  >
+                                    <span
+                                      className={`font-mono font-black text-[10px] px-1.5 py-0.5 rounded-md shrink-0 ${badgeClass}`}
+                                    >
+                                      {item.code}
+                                    </span>
+                                    <span className="text-[10px] font-bold leading-tight truncate" title={item.name}>
+                                      {item.name.replace(/^Area \d+ - /, "")}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Detail Data Table for Bubble Chart Matrix */}
+              {showBubbleTable && (
+                <div className="mt-4 pt-4 border-t border-[#f0effc]">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[#154be2] text-lg font-bold">
+                      table_chart
+                    </span>
+                    <h4 className="text-xs font-black text-[#181a2c] uppercase tracking-wider">
+                      Tabel Angka Matrix Efficiency Ratio ({bubbleDimension === "activity" ? "Activity" : "Territory"})
+                    </h4>
+                    <span className="text-[10px] font-extrabold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                      {filteredSortedBubbleTableData.length} Data
+                    </span>
+                  </div>
+
+                  {/* Table Search & Sort Controls */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Search Input */}
+                    <div className="relative flex items-center">
+                      <span className="material-symbols-outlined absolute left-2.5 text-slate-400 text-[16px]">
+                        search
+                      </span>
+                      <input
+                        type="text"
+                        value={bubbleSearchQuery}
+                        onChange={(e) => setBubbleSearchQuery(e.target.value)}
+                        placeholder="Cari nama / kode..."
+                        className="pl-8 pr-3 py-1.5 bg-[#fbfaff] border border-[#e2e8f0] rounded-xl text-xs font-semibold text-[#181a2c] outline-none focus:border-[#154be2] w-36 sm:w-44 transition-all"
+                      />
+                      {bubbleSearchQuery && (
+                        <button
+                          onClick={() => setBubbleSearchQuery("")}
+                          className="absolute right-2 text-slate-400 hover:text-slate-600"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">close</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Sort Field Selector */}
+                    <div className="flex items-center gap-1 bg-[#fbfaff] p-1 rounded-xl border border-[#e2e8f0] text-xs">
+                      <span className="text-[10px] font-bold text-slate-400 px-1 select-none">Urut:</span>
+                      <select
+                        value={bubbleTableSortField}
+                        onChange={(e) => setBubbleTableSortField(e.target.value as any)}
+                        className="bg-transparent font-bold text-[#181a2c] text-xs outline-none cursor-pointer"
+                      >
+                        <option value="y">Avg Attendance</option>
+                        <option value="x">Cost per Farmer (CPF)</option>
+                        <option value="actualReach">Farmer Reach</option>
+                        <option value="actualActivity">Total Activity</option>
+                        <option value="actualNominal">Total Anggaran</option>
+                        <option value="name">Nama {bubbleDimension === "activity" ? "Activity" : "Territory"}</option>
+                      </select>
+                      <button
+                        onClick={() => setBubbleTableSortOrder(prev => prev === "asc" ? "desc" : "asc")}
+                        className="p-1 rounded-lg hover:bg-slate-200 text-slate-600 font-bold transition-all cursor-pointer"
+                        title={bubbleTableSortOrder === "asc" ? "Urutan Menaik (Ascending)" : "Urutan Menurun (Descending)"}
+                      >
+                        <span className="material-symbols-outlined text-[16px]">
+                          {bubbleTableSortOrder === "asc" ? "north" : "south"}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Responsive Table Container */}
+                <div className="overflow-x-auto rounded-2xl border border-[#e2e8f0] bg-white shadow-sm">
+                  <table className="w-full text-left border-collapse text-xs font-sans">
+                    <thead>
+                      <tr className="bg-[#f8fafc] text-[#64748b] font-extrabold border-b border-[#e2e8f0] text-[11px] uppercase tracking-wider">
+                        <th className="py-3 px-3.5"># Kode & Nama</th>
+                        <th className="py-3 px-3">Status Kuadran</th>
+                        <th className="py-3 px-3 text-right">Avg Attendance</th>
+                        <th className="py-3 px-3 text-right">Cost per Farmer (CPF)</th>
+                        <th className="py-3 px-3 text-right">Farmer Reach (Aktual / Target)</th>
+                        <th className="py-3 px-3 text-right">Total Activity (Aktual / Target)</th>
+                        <th className="py-3 px-3 text-right">Anggaran (Aktual / Target)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium">
+                      {filteredSortedBubbleTableData.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="py-6 text-center text-slate-400 font-semibold text-xs">
+                            Tidak ada data yang cocok dengan pencarian "{bubbleSearchQuery}"
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredSortedBubbleTableData.map((row) => {
+                          const color = getBubbleQuadrantColor(row.x, row.y);
+                          const isSelected = activeBubbleKey === row.name;
+
+                          let quadLabel = "";
+                          let quadBg = "";
+                          if (row.x >= 100 && row.y >= 50) {
+                            quadLabel = "High Performer";
+                            quadBg = "bg-emerald-50 text-emerald-700 border-emerald-200";
+                          } else if (row.x < 100 && row.y >= 50) {
+                            quadLabel = "High Attendance";
+                            quadBg = "bg-blue-50 text-blue-700 border-blue-200";
+                          } else if (row.x >= 100 && row.y < 50) {
+                            quadLabel = "Cost Efficient";
+                            quadBg = "bg-cyan-50 text-cyan-700 border-cyan-200";
+                          } else {
+                            quadLabel = "Need Review";
+                            quadBg = "bg-amber-50 text-amber-700 border-amber-200";
+                          }
+
+                          return (
+                            <tr
+                              key={row.name}
+                              onClick={() => setActiveBubbleKey(prev => prev === row.name ? null : row.name)}
+                              className={`transition-all cursor-pointer ${
+                                isSelected
+                                  ? "bg-[#154be2]/10 font-semibold"
+                                  : "hover:bg-slate-50/80"
+                              }`}
+                            >
+                              <td className="py-3 px-3.5">
+                                <div className="flex items-center gap-2">
+                                  <div className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                                  <span className="font-black text-xs text-[#181a2c] px-1.5 py-0.5 rounded-md bg-slate-100 border border-slate-200">
+                                    {row.code}
+                                  </span>
+                                  <span className="font-bold text-slate-800 text-xs truncate max-w-[170px]" title={row.name}>
+                                    {row.name}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-3">
+                                <span className={`inline-block text-[10px] font-black px-2 py-0.5 rounded-full border ${quadBg}`}>
+                                  {quadLabel}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 text-right">
+                                <div className="font-black text-[#154be2] text-xs">{row.y} orang</div>
+                                <div className="text-[10px] text-slate-500 font-normal">pengunjung / event</div>
+                              </td>
+                              <td className="py-3 px-3 text-right">
+                                <div className="font-black text-emerald-600 text-xs">Rp {row.costPerReach.toLocaleString("id-ID")}</div>
+                                <div className="text-[10px] text-slate-500 font-normal">per petani reached</div>
+                              </td>
+                              <td className="py-3 px-3 text-right">
+                                <div className="font-black text-slate-800 text-xs">
+                                  {row.actualReach.toLocaleString("id-ID")} <span className="text-slate-400 font-normal">/ {row.budgetReach.toLocaleString("id-ID")}</span>
+                                </div>
+                                <div className="text-[10px] text-slate-500 font-semibold">{row.reachPct}% target</div>
+                              </td>
+                              <td className="py-3 px-3 text-right">
+                                <div className="font-black text-slate-800 text-xs">
+                                  {row.actualActivity} <span className="text-slate-400 font-normal">/ {row.budgetActivity}</span>
+                                </div>
+                                <div className="text-[10px] text-slate-500 font-semibold">{row.activityPct}% target</div>
+                              </td>
+                              <td className="py-3 px-3 text-right">
+                                <div className="font-black text-slate-800 text-xs">
+                                  Rp {(row.actualNominal / 1000000).toFixed(1)} Jt <span className="text-slate-400 font-normal">/ {(row.budgetNominal / 1000000).toFixed(1)} Jt</span>
+                                </div>
+                                <div className="text-[10px] text-slate-500 font-semibold">{row.nominalPct}% target</div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+
+                    {/* Summary / Total Footer */}
+                    {bubbleTableTotals && (
+                      <tfoot>
+                        <tr className="bg-[#f1f5f9] font-black text-slate-800 border-t-2 border-slate-300 text-xs">
+                          <td className="py-3 px-3.5" colSpan={2}>
+                            <div className="flex items-center gap-1.5 text-xs text-[#181a2c]">
+                              <span className="material-symbols-outlined text-sm text-[#154be2]">analytics</span>
+                              <span>TOTAL / RATA-RATA</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-3 text-right text-[#154be2]">
+                            <div>{bubbleTableTotals.avgY} orang</div>
+                            <div className="text-[10px] text-slate-500 font-semibold">{bubbleTableTotals.reachPerAct} petani/act</div>
+                          </td>
+                          <td className="py-3 px-3 text-right text-emerald-600">
+                            <div>Rp {bubbleTableTotals.costPerReach.toLocaleString("id-ID")}</div>
+                            <div className="text-[10px] text-slate-500 font-semibold">Rata-rata CPF</div>
+                          </td>
+                          <td className="py-3 px-3 text-right">
+                            <div>{bubbleTableTotals.totalActualReach.toLocaleString("id-ID")} / {bubbleTableTotals.totalBudgetReach.toLocaleString("id-ID")}</div>
+                            <div className="text-[10px] text-slate-500 font-semibold">{bubbleTableTotals.reachPct}% target</div>
+                          </td>
+                          <td className="py-3 px-3 text-right">
+                            <div>{bubbleTableTotals.totalActualActivity} / {bubbleTableTotals.totalBudgetActivity}</div>
+                            <div className="text-[10px] text-slate-500 font-semibold">{bubbleTableTotals.activityPct}% target</div>
+                          </td>
+                          <td className="py-3 px-3 text-right">
+                            <div>Rp {(bubbleTableTotals.totalActualNominal / 1000000).toFixed(1)} Jt / {(bubbleTableTotals.totalBudgetNominal / 1000000).toFixed(1)} Jt</div>
+                            <div className="text-[10px] text-slate-500 font-semibold">{bubbleTableTotals.nominalPct}% target</div>
+                          </td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+              </div>
+              )}
+            </div>
+          )}
+
+          {/* Section: Conversion Sales Rate */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             {/* Left: Conversion Sales Rate by Activity */}
             <div className="bg-white p-6 rounded-[40px] shadow-[0_12px_32px_rgba(21,75,226,0.18)] border border-[#154be2]/8 flex flex-col justify-between mt-6 lg:mt-8">
@@ -11318,7 +12376,7 @@ const Dashboard = ({
                     className={`flex items-center gap-2 hover:opacity-85 transition-all cursor-pointer ${!showBudgetBar ? "opacity-35 line-through" : ""}`}
                     title="Klik untuk menyembunyikan/menampilkan Budget"
                   >
-                    <div className="w-3.5 h-3.5 rounded-sm bg-gradient-to-b from-[#ea580c] to-[#c2410c] shadow-sm"></div>
+                    <div className="w-3.5 h-3.5 rounded-sm bg-gradient-to-b from-[#154be2] to-[#3b82f6] shadow-sm"></div>
                     <span className="text-[10.5px] font-bold text-slate-700 uppercase tracking-wide">Budget</span>
                   </button>
                   <button
@@ -11327,7 +12385,7 @@ const Dashboard = ({
                     className={`flex items-center gap-2 hover:opacity-85 transition-all cursor-pointer ${!showActualBar ? "opacity-35 line-through" : ""}`}
                     title="Klik untuk menyembunyikan/menampilkan Actual"
                   >
-                    <div className="w-3.5 h-3.5 rounded-sm bg-gradient-to-b from-[#f97316] to-[#ea580c] shadow-sm"></div>
+                    <div className="w-3.5 h-3.5 rounded-sm bg-gradient-to-b from-[#06b6d4] to-[#22d3ee] shadow-sm"></div>
                     <span className="text-[10.5px] font-bold text-slate-700 uppercase tracking-wide">Actual</span>
                   </button>
                 </div>
@@ -15975,6 +17033,67 @@ const CustomChartTooltip = (props: any) => {
   );
 };
 
+const getBubbleQuadrantColor = (x: number, y: number) => {
+  if (x < 110 && y >= 50) return "#10b981"; // Emerald - High Performer
+  if (x >= 110 && y >= 50) return "#154be2";  // Blue - High Attendance
+  if (x < 110 && y < 50) return "#06b6d4";  // Cyan - Cost Efficient
+  return "#f59e0b";                           // Amber - Need Review
+};
+
+const CustomBubbleTooltip = ({ active, payload }: any) => {
+  if (!active || !payload || !payload.length) return null;
+  const data = payload[0]?.payload;
+  if (!data) return null;
+
+  const color = getBubbleQuadrantColor(data.x, data.y);
+
+  let quadText = "";
+  if (data.x < 110 && data.y >= 50) quadText = "🌟 High Performer (Pengunjung Terbanyak & Biaya Efisien)";
+  else if (data.x >= 110 && data.y >= 50) quadText = "⚡ High Attendance (Pengunjung Tinggi, Perlu Efisiensi Biaya)";
+  else if (data.x < 110 && data.y < 50) quadText = "💡 Cost Efficient (Biaya Efisien, Potensi Skala Pengunjung)";
+  else quadText = "⚠️ Need Review (Perlu Evaluasi Pengunjung & Biaya)";
+
+  return (
+    <div className="bg-white/95 backdrop-blur-md p-4 rounded-2xl shadow-[0_16px_40px_rgba(21,75,226,0.22)] border border-[#154be2]/15 text-xs max-w-xs font-sans pointer-events-auto select-none">
+      <div className="flex items-center gap-2 pb-2 mb-2 border-b border-slate-100">
+        <div className="size-3 rounded-full shrink-0" style={{ backgroundColor: color }} />
+        <span className="font-black text-[#181a2c] text-sm">{data.name}</span>
+      </div>
+
+      <div className="text-[10px] font-extrabold px-2 py-0.5 rounded-md mb-2 bg-slate-100 text-slate-700">
+        {quadText}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 text-[11px] mb-2.5">
+        <div className="bg-[#154be2]/5 p-2 rounded-xl border border-[#154be2]/10">
+          <p className="text-[9px] text-[#8E94B7] font-bold uppercase">Avg Attendance</p>
+          <p className="text-sm font-black text-[#154be2] mt-0.5">{data.y} orang/event</p>
+        </div>
+        <div className="bg-emerald-500/5 p-2 rounded-xl border border-emerald-500/10">
+          <p className="text-[9px] text-[#8E94B7] font-bold uppercase">Cost per Farmer (CPF)</p>
+          <p className="text-sm font-black text-emerald-600 mt-0.5">Rp {data.costPerReach.toLocaleString("id-ID")}</p>
+          <p className="text-[9px] text-slate-500 font-medium">Pengeluaran per petani</p>
+        </div>
+      </div>
+
+      <div className="space-y-1 text-[10.5px] text-slate-600 pt-1 border-t border-slate-100 font-medium">
+        <div className="flex justify-between">
+          <span>Farmer Reach:</span>
+          <span className="font-black text-[#181a2c]">{data.actualReach.toLocaleString("id-ID")} / {data.budgetReach.toLocaleString("id-ID")} ({data.reachPct}%)</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Total Activity:</span>
+          <span className="font-black text-[#181a2c]">{data.actualActivity} / {data.budgetActivity} ({data.activityPct}%)</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Total Anggaran:</span>
+          <span className="font-black text-[#181a2c]">Rp {(data.actualNominal / 1000000).toFixed(1)} Jt ({data.nominalPct}%)</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const OverviewXAxisTick = (props: any) => {
   const { x, y, payload } = props;
   const value = payload?.value || "";
@@ -17068,7 +18187,7 @@ export function CurvedProgressIndicator({ pct, index = 0 }: CurvedProgressIndica
   }, [pct]);
 
   return (
-    <div className="absolute right-0 top-0 bottom-0 w-[55px] xs:w-[75px] sm:w-[110px] lg:w-[130px] h-full shrink-0 z-10 overflow-hidden rounded-r-[32px] select-none pointer-events-none">
+    <div className="absolute right-0 top-0 bottom-0 w-[55px] xs:w-[75px] sm:w-[110px] lg:w-[130px] h-full shrink-0 z-10 overflow-hidden rounded-r-[20px] sm:rounded-r-[24px] select-none pointer-events-none">
       <svg className="size-full" viewBox="0 0 130 110" preserveAspectRatio="none">
         {/* Right side shaded region */}
         <path
@@ -17129,10 +18248,10 @@ export function CurvedProgressIndicator({ pct, index = 0 }: CurvedProgressIndica
       </svg>
       {/* HTML-rendered Percentage Text to avoid any SVG stretching/distortion */}
       <div className="absolute left-[54%] xs:left-[60%] sm:left-[68%] -translate-x-1/2 top-1/2 -translate-y-1/2 flex items-baseline text-white">
-        <span className="font-sans font-black text-[11px] xs:text-[15px] sm:text-[22px] md:text-[23px] tracking-tight leading-none">
+        <span className="font-sans font-black text-[13px] xs:text-[17px] sm:text-[25px] md:text-[27px] tracking-tight leading-none">
           {Math.round(animatedPct)}
         </span>
-        <span className="font-sans font-black text-[7px] xs:text-[9px] sm:text-[13px] md:text-[14px] leading-none ml-px opacity-90">
+        <span className="font-sans font-black text-[8px] xs:text-[10px] sm:text-[14px] md:text-[15px] leading-none ml-px opacity-90">
           %
         </span>
       </div>
