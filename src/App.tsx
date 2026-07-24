@@ -9854,11 +9854,11 @@ const Dashboard = ({
                 <h1 className="text-lg font-semibold text-[#181a2c] tracking-tight">
                   Executive{" "}
                   <span className="text-primary font-bold">
-                    {activeTab === "overview_v2" ? "Overview V2" : "Overview"}
+                    Overview
                   </span>
                 </h1>
                 <p className="text-[11px] text-[#8E94B7] font-semibold uppercase tracking-wider mt-0.5">
-                  Analisis Kinerja & Pemantauan Tingkat Nasional{activeTab === "overview_v2" ? " V2" : ""}
+                  Analisis Kinerja & Pemantauan Tingkat Nasional
                 </p>
               </div>
             </div>
@@ -9874,9 +9874,13 @@ const Dashboard = ({
                   >
                     <option value="overview" className="text-slate-900 bg-white font-semibold">Overview</option>
                     <option value="monitoring" className="text-slate-900 bg-white font-semibold">Monitoring</option>
-                    <option value="activity" className="text-slate-900 bg-white font-semibold">Activity</option>
-                    <option value="nominal" className="text-slate-900 bg-white font-semibold">Nominal</option>
-                    <option value="reach" className="text-slate-900 bg-white font-semibold">Reach</option>
+                    {activeTab !== "overview_v2" && (
+                      <>
+                        <option value="activity" className="text-slate-900 bg-white font-semibold">Activity</option>
+                        <option value="nominal" className="text-slate-900 bg-white font-semibold">Nominal</option>
+                        <option value="reach" className="text-slate-900 bg-white font-semibold">Reach</option>
+                      </>
+                    )}
                   </select>
                   <span className="material-symbols-outlined absolute right-0 top-1/2 -translate-y-1/2 text-[18px] text-white pointer-events-none font-bold">
                     expand_more
@@ -10382,11 +10386,11 @@ const Dashboard = ({
                       const isMobile = windowWidth < 640;
                       const isTablet = windowWidth >= 640 && windowWidth < 1024;
                       const currentMargin = isMobile
-                        ? { top: 22, right: 30, left: 30, bottom: 22 }
+                        ? { top: 32, right: 35, left: 35, bottom: 15 }
                         : isTablet
-                          ? { top: 32, right: 45, left: 45, bottom: 32 }
-                          : { top: 42, right: 65, left: 65, bottom: 42 };
-                      const currentOuterRadius = isMobile ? 42 : isTablet ? 64 : 92;
+                          ? { top: 45, right: 50, left: 50, bottom: 25 }
+                          : { top: 60, right: 70, left: 70, bottom: 30 };
+                      const currentOuterRadius = isMobile ? 38 : isTablet ? 58 : 82;
 
                       return (
                         <div className="flex flex-col h-full min-h-[220px] lg:min-h-[260px] gap-1 relative">
@@ -10426,13 +10430,13 @@ const Dashboard = ({
                             </div>
                           </div>
 
-                          <div className="w-full h-[180px] sm:h-[210px] lg:h-[290px] relative">
-                            <ResponsiveContainer key={`sub-pie-container-${activeIndex}-${subData.length}`} width="100%" height="100%">
+                          <div className="w-full h-[200px] sm:h-[240px] lg:h-[340px] relative">
+                            <ResponsiveContainer key={`sub-pie-container-${subGroupDimension}-${subData.length}`} width="100%" height="100%">
                               <PieChart margin={currentMargin}>
                                 <Pie
                                   data={subData}
                                   cx="50%"
-                                  cy="50%"
+                                  cy="54%"
                                   outerRadius={currentOuterRadius}
                                   dataKey={metricKey}
                                   nameKey="name"
@@ -11293,7 +11297,10 @@ const Dashboard = ({
                           return (
                             <button
                               key={card.key}
-                              onClick={() => setOverviewSubFilter(card.key as any)}
+                              onClick={() => {
+                                setOverviewSubFilter(card.key as any);
+                                setClickedPieIndex(null);
+                              }}
                               className={`rounded-[20px] sm:rounded-[24px] flex flex-row items-center justify-between relative overflow-hidden group transition-all duration-300 w-full text-left cursor-pointer border-0 py-2 xs:py-2.5 sm:py-3 pl-3.5 xs:pl-4 sm:pl-5 pr-[50px] xs:pr-[65px] sm:pr-[95px] lg:pr-[105px] ${activeTab === "overview_v2" ? "col-span-1 h-full" : "lg:flex-1 lg:min-h-0"} min-h-[70px] xs:min-h-[80px] sm:min-h-[88px] ${cardStyle} ${shadowStyle}`}
                             >
                               <div className="flex flex-col justify-center z-10 min-w-0 flex-1 pr-1">
@@ -17367,13 +17374,13 @@ export default function App() {
               return "partner";
             }
           }
-          return "overview";
+          return "overview_v2";
         }
       }
     } catch (e) {
       console.warn("Failed to determine initial tab:", e);
     }
-    return "overview";
+    return "overview_v2";
   });
   const [isMenuVisible, setIsMenuVisible] = useState(true);
   const [isAutoLoggingIn, setIsAutoLoggingIn] = useState(true);
@@ -17448,6 +17455,14 @@ export default function App() {
   const [filterBelowType, setFilterBelowType] = useState<string>("All");
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
 
+  useEffect(() => {
+    if (activeTab === "overview_v2") {
+      if (overviewMetricFilter === "activity" || overviewMetricFilter === "nominal" || overviewMetricFilter === "reach") {
+        setOverviewMetricFilter("overview");
+      }
+    }
+  }, [activeTab, overviewMetricFilter]);
+
   const isAditya =
     userData &&
     (cleanForMatch(userData.name) === "adityawiratama" ||
@@ -17512,7 +17527,7 @@ export default function App() {
   const showPartnerTab = false;
   const showCdpTab = userData ? !!userAccess.cdp : false;
   const showTrackingTab = userData ? !!userAccess.tracking : false;
-  const showOverviewTab = userData ? !!userAccess.overview : false;
+  const showOverviewTab = false;
   const showOverviewV2Tab = userData ? !!userAccess.overview_v2 : false;
   const showTempTab = userData ? !!userAccess.temp : false;
   const showAccessTab = userData ? (!!userAccess.access || isAditya) : false;
@@ -17810,7 +17825,7 @@ export default function App() {
                 analytics
               </span>
               <span className={`font-semibold text-xs hidden ${isSidebarExpanded ? "lg:block" : ""}`}>
-                Overview V2
+                Overview
               </span>
             </button>
           )}
@@ -17982,7 +17997,7 @@ export default function App() {
                   analytics
                 </span>
                 <span className="text-[7.5px] font-bold uppercase tracking-wider leading-none mt-0.5">
-                  Overview V2
+                  Overview
                 </span>
               </button>
             )}
