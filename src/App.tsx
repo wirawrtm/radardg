@@ -10277,7 +10277,7 @@ const Dashboard = ({
                             <ResponsiveContainer width="100%" height="100%">
                               <BarChart
                                 data={chartData}
-                                margin={{ top: 25, right: 10, left: -10, bottom: 5 }}
+                                margin={{ top: 48, right: 15, left: 15, bottom: 5 }}
                               >
                                 <CartesianGrid
                                   strokeDasharray="4 4"
@@ -10386,10 +10386,10 @@ const Dashboard = ({
                       const isMobile = windowWidth < 640;
                       const isTablet = windowWidth >= 640 && windowWidth < 1024;
                       const currentMargin = isMobile
-                        ? { top: 32, right: 35, left: 35, bottom: 15 }
+                        ? { top: 5, right: 35, left: 35, bottom: 10 }
                         : isTablet
-                          ? { top: 45, right: 50, left: 50, bottom: 25 }
-                          : { top: 60, right: 70, left: 70, bottom: 30 };
+                          ? { top: 10, right: 50, left: 50, bottom: 15 }
+                          : { top: 15, right: 70, left: 70, bottom: 20 };
                       const currentOuterRadius = isMobile ? 38 : isTablet ? 58 : 82;
 
                       return (
@@ -10436,7 +10436,7 @@ const Dashboard = ({
                                 <Pie
                                   data={subData}
                                   cx="50%"
-                                  cy="54%"
+                                  cy="50%"
                                   outerRadius={currentOuterRadius}
                                   dataKey={metricKey}
                                   nameKey="name"
@@ -10717,7 +10717,7 @@ const Dashboard = ({
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart
                           data={overviewStats.areaChartData}
-                          margin={{ top: 38, right: 10, left: -10, bottom: 0 }}
+                          margin={{ top: 48, right: 15, left: 15, bottom: 0 }}
                           barGap={currentBarGap}
                           barCategoryGap={currentBarCategoryGap}
                           onMouseMove={(state) => {
@@ -10996,7 +10996,7 @@ const Dashboard = ({
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart
                           data={overviewStats.subChartData || []}
-                          margin={{ top: 38, right: 10, left: -10, bottom: 0 }}
+                          margin={{ top: 48, right: 15, left: 15, bottom: 0 }}
                           barGap={currentBarGap}
                           barCategoryGap={currentBarCategoryGap}
                           onMouseMove={(state) => {
@@ -12421,7 +12421,7 @@ const Dashboard = ({
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={overviewHistoryData}
-                  margin={{ top: 38, right: 10, left: -10, bottom: 0 }}
+                  margin={{ top: 48, right: 15, left: 15, bottom: 0 }}
                   barGap={currentBarGap}
                   barCategoryGap={currentBarCategoryGap}
                   onMouseMove={(state) => {
@@ -12766,7 +12766,7 @@ const Dashboard = ({
                     <ResponsiveContainer width="100%" height="100%">
                        <BarChart
                         data={focusedChartType === "sub" ? overviewStats.subChartData : overviewStats.areaChartData}
-                        margin={{ top: 45, right: 15, left: -10, bottom: 35 }}
+                        margin={{ top: 55, right: 20, left: 15, bottom: 35 }}
                         barGap={currentBarGap}
                         barCategoryGap={currentBarCategoryGap}
                         onMouseMove={(state) => {
@@ -16955,9 +16955,9 @@ const CustomActualLabel = (props: any) => {
         textAnchor="middle"
         fill="none"
         stroke="#ffffff"
-        strokeWidth={4.5}
+        strokeWidth={3.5}
         strokeLinejoin="round"
-        fontSize={11}
+        fontSize={8.5}
         fontWeight={800}
         fontFamily="sans-serif"
       >
@@ -16968,7 +16968,7 @@ const CustomActualLabel = (props: any) => {
         y={y - 8}
         textAnchor="middle"
         fill="#0a90a6"
-        fontSize={11}
+        fontSize={8.5}
         fontWeight={800}
         fontFamily="sans-serif"
       >
@@ -17138,10 +17138,10 @@ const OverviewXAxisTick = (props: any) => {
         {nameLines.map((word: string, index: number) => (
           <tspan 
             x={0} 
-            dy={index === 0 ? 11 : 11} 
+            dy={index === 0 ? 9 : 9} 
             key={`word-overview-${index}`} 
             fill="#8E94B7" 
-            style={{ fontSize: "10.5px", fontWeight: 800 }}
+            style={{ fontSize: "8px", fontWeight: 800 }}
           >
             {word}
           </tspan>
@@ -17222,7 +17222,7 @@ const CustomXAxisTick = (props: any) => {
             x={0}
             dy={8}
             fill={gap >= 0 ? "#0a90a6" : "#df1b1b"}
-            style={{ fontSize: "11px", fontWeight: 900 }}
+            style={{ fontSize: "8px", fontWeight: 900 }}
           >
             {gapText}
           </tspan>
@@ -17230,10 +17230,10 @@ const CustomXAxisTick = (props: any) => {
         {nameLines.map((word: string, index: number) => (
           <tspan 
             x={0} 
-            dy={index === 0 ? (item ? 13 : 8) : 10} 
+            dy={index === 0 ? (item ? 13 : 8) : 9} 
             key={`word-${index}`} 
             fill="#4e5572" 
-            style={{ fontSize: "8.5px", fontWeight: 700 }}
+            style={{ fontSize: "7.5px", fontWeight: 700 }}
           >
             {word}
           </tspan>
