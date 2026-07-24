@@ -11645,185 +11645,201 @@ const Dashboard = ({
                       </div>
                     );
                   })()}
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ScatterChart margin={{ top: 25, right: 20, bottom: 25, left: 55 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.8} />
+                  {(() => {
+                    const { minCPF, maxCPF, minAttendance, maxAttendance } = (() => {
+                      if (!bubbleChartData || bubbleChartData.length === 0) {
+                        return { minCPF: 50, maxCPF: 180, minAttendance: 10, maxAttendance: 90 };
+                      }
+                      const xValues = bubbleChartData.map((d: any) => d.x);
+                      const yValues = bubbleChartData.map((d: any) => d.y);
+                      return {
+                        minCPF: Math.min(50, ...xValues),
+                        maxCPF: Math.max(180, ...xValues),
+                        minAttendance: Math.min(10, ...yValues),
+                        maxAttendance: Math.max(90, ...yValues),
+                      };
+                    })();
 
-                      {/* Quadrant Background Colors & Titles (Full Coverage) */}
-                      <ReferenceArea
-                        x1={50}
-                        x2={110}
-                        y1={50}
-                        y2={90}
-                        shape={(props: any) => {
-                          const { x, y, width, height } = props;
-                          if (!width || !height) return null;
-                          return (
-                            <g>
-                              <rect
-                                x={x}
-                                y={y}
-                                width={width}
-                                height={height}
-                                fill="#10b981"
-                                fillOpacity={0.08}
-                              />
-                              <text
-                                x={x + width - 10}
-                                y={y + 18}
-                                fill="#059669"
-                                fontSize={10}
-                                fontWeight={800}
-                                textAnchor="end"
-                              >
-                                KUADRAN I • High Performer
-                              </text>
-                            </g>
-                          );
-                        }}
-                      />
-                      <ReferenceArea
-                        x1={110}
-                        x2={180}
-                        y1={50}
-                        y2={90}
-                        shape={(props: any) => {
-                          const { x, y, width, height } = props;
-                          if (!width || !height) return null;
-                          return (
-                            <g>
-                              <rect
-                                x={x}
-                                y={y}
-                                width={width}
-                                height={height}
-                                fill="#154be2"
-                                fillOpacity={0.07}
-                              />
-                              <text
-                                x={x + 10}
-                                y={y + 18}
-                                fill="#154be2"
-                                fontSize={10}
-                                fontWeight={800}
-                                textAnchor="start"
-                              >
-                                KUADRAN II • High Attendance
-                              </text>
-                            </g>
-                          );
-                        }}
-                      />
-                      <ReferenceArea
-                        x1={50}
-                        x2={110}
-                        y1={10}
-                        y2={50}
-                        shape={(props: any) => {
-                          const { x, y, width, height } = props;
-                          if (!width || !height) return null;
-                          return (
-                            <g>
-                              <rect
-                                x={x}
-                                y={y}
-                                width={width}
-                                height={height}
-                                fill="#06b6d4"
-                                fillOpacity={0.08}
-                              />
-                              <text
-                                x={x + width - 10}
-                                y={y + height - 10}
-                                fill="#0891b2"
-                                fontSize={10}
-                                fontWeight={800}
-                                textAnchor="end"
-                              >
-                                KUADRAN III • Cost Efficient
-                              </text>
-                            </g>
-                          );
-                        }}
-                      />
-                      <ReferenceArea
-                        x1={110}
-                        x2={180}
-                        y1={10}
-                        y2={50}
-                        shape={(props: any) => {
-                          const { x, y, width, height } = props;
-                          if (!width || !height) return null;
-                          return (
-                            <g>
-                              <rect
-                                x={x}
-                                y={y}
-                                width={width}
-                                height={height}
-                                fill="#f59e0b"
-                                fillOpacity={0.08}
-                              />
-                              <text
-                                x={x + 10}
-                                y={y + height - 10}
-                                fill="#d97706"
-                                fontSize={10}
-                                fontWeight={800}
-                                textAnchor="start"
-                              >
-                                KUADRAN IV • Need Review
-                              </text>
-                            </g>
-                          );
-                        }}
-                      />
+                    return (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ScatterChart margin={{ top: 25, right: 20, bottom: 25, left: 55 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.8} />
 
-                      <XAxis
-                        type="number"
-                        dataKey="x"
-                        name="Cost per Farmer (CPF)"
-                        reversed={true}
-                        domain={[50, 180]}
-                        tickFormatter={(val) => `Rp ${val}k`}
-                        tick={{ fill: "#64748b", fontSize: 10, fontWeight: 700 }}
-                        axisLine={{ stroke: "#cbd5e1" }}
-                        label={{
-                          value: "Cost per Farmer (CPF) / Pengeluaran per Petani",
-                          position: "bottom",
-                          offset: 10,
-                          style: { fill: "#154be2", fontSize: 10, fontWeight: 800 }
-                        }}
-                      />
-                      <YAxis
-                        type="number"
-                        dataKey="y"
-                        name="Average Attendance"
-                        unit=""
-                        domain={[10, 90]}
-                        width={40}
-                        tick={{ fill: "#64748b", fontSize: 10, fontWeight: 700 }}
-                        axisLine={{ stroke: "#cbd5e1" }}
-                        label={(props: any) => {
-                          const { viewBox } = props;
-                          if (!viewBox) return null;
-                          const centerY = viewBox.y + viewBox.height / 2;
-                          const x = viewBox.x - 38;
-                          return (
-                            <text
-                              x={x}
-                              y={centerY}
-                              fill="#154be2"
-                              fontSize={10}
-                              fontWeight={800}
-                              textAnchor="middle"
-                              transform={`rotate(-90, ${x}, ${centerY})`}
-                            >
-                              Average Attendance (Pengunjung / Event)
-                            </text>
-                          );
-                        }}
-                      />
+                          {/* Quadrant Background Colors & Titles (Full Coverage) */}
+                          <ReferenceArea
+                            x1={minCPF}
+                            x2={110}
+                            y1={50}
+                            y2={maxAttendance}
+                            shape={(props: any) => {
+                              const { x, y, width, height } = props;
+                              if (!width || !height) return null;
+                              return (
+                                <g>
+                                  <rect
+                                    x={x}
+                                    y={y}
+                                    width={width}
+                                    height={height}
+                                    fill="#10b981"
+                                    fillOpacity={0.08}
+                                  />
+                                  <text
+                                    x={x + width - 10}
+                                    y={y + 18}
+                                    fill="#059669"
+                                    fontSize={10}
+                                    fontWeight={800}
+                                    textAnchor="end"
+                                  >
+                                    KUADRAN I • High Performer
+                                  </text>
+                                </g>
+                              );
+                            }}
+                          />
+                          <ReferenceArea
+                            x1={110}
+                            x2={maxCPF}
+                            y1={50}
+                            y2={maxAttendance}
+                            shape={(props: any) => {
+                              const { x, y, width, height } = props;
+                              if (!width || !height) return null;
+                              return (
+                                <g>
+                                  <rect
+                                    x={x}
+                                    y={y}
+                                    width={width}
+                                    height={height}
+                                    fill="#154be2"
+                                    fillOpacity={0.07}
+                                  />
+                                  <text
+                                    x={x + 10}
+                                    y={y + 18}
+                                    fill="#154be2"
+                                    fontSize={10}
+                                    fontWeight={800}
+                                    textAnchor="start"
+                                  >
+                                    KUADRAN II • High Attendance
+                                  </text>
+                                </g>
+                              );
+                            }}
+                          />
+                          <ReferenceArea
+                            x1={minCPF}
+                            x2={110}
+                            y1={minAttendance}
+                            y2={50}
+                            shape={(props: any) => {
+                              const { x, y, width, height } = props;
+                              if (!width || !height) return null;
+                              return (
+                                <g>
+                                  <rect
+                                    x={x}
+                                    y={y}
+                                    width={width}
+                                    height={height}
+                                    fill="#06b6d4"
+                                    fillOpacity={0.08}
+                                  />
+                                  <text
+                                    x={x + width - 10}
+                                    y={y + height - 10}
+                                    fill="#0891b2"
+                                    fontSize={10}
+                                    fontWeight={800}
+                                    textAnchor="end"
+                                  >
+                                    KUADRAN III • Cost Efficient
+                                  </text>
+                                </g>
+                              );
+                            }}
+                          />
+                          <ReferenceArea
+                            x1={110}
+                            x2={maxCPF}
+                            y1={minAttendance}
+                            y2={50}
+                            shape={(props: any) => {
+                              const { x, y, width, height } = props;
+                              if (!width || !height) return null;
+                              return (
+                                <g>
+                                  <rect
+                                    x={x}
+                                    y={y}
+                                    width={width}
+                                    height={height}
+                                    fill="#f59e0b"
+                                    fillOpacity={0.08}
+                                  />
+                                  <text
+                                    x={x + 10}
+                                    y={y + height - 10}
+                                    fill="#d97706"
+                                    fontSize={10}
+                                    fontWeight={800}
+                                    textAnchor="start"
+                                  >
+                                    KUADRAN IV • Need Review
+                                  </text>
+                                </g>
+                              );
+                            }}
+                          />
+
+                          <XAxis
+                            type="number"
+                            dataKey="x"
+                            name="Cost per Farmer (CPF)"
+                            reversed={true}
+                            domain={[minCPF, maxCPF]}
+                            tickFormatter={(val) => `Rp ${val}k`}
+                            tick={{ fill: "#64748b", fontSize: 10, fontWeight: 700 }}
+                            axisLine={{ stroke: "#cbd5e1" }}
+                            label={{
+                              value: "Cost per Farmer (CPF) / Pengeluaran per Petani",
+                              position: "bottom",
+                              offset: 10,
+                              style: { fill: "#154be2", fontSize: 10, fontWeight: 800 }
+                            }}
+                          />
+                          <YAxis
+                            type="number"
+                            dataKey="y"
+                            name="Average Attendance"
+                            unit=""
+                            domain={[minAttendance, maxAttendance]}
+                            width={40}
+                            tick={{ fill: "#64748b", fontSize: 10, fontWeight: 700 }}
+                            axisLine={{ stroke: "#cbd5e1" }}
+                            label={(props: any) => {
+                              const { viewBox } = props;
+                              if (!viewBox) return null;
+                              const centerY = viewBox.y + viewBox.height / 2;
+                              const x = viewBox.x - 38;
+                              return (
+                                <text
+                                  x={x}
+                                  y={centerY}
+                                  fill="#154be2"
+                                  fontSize={10}
+                                  fontWeight={800}
+                                  textAnchor="middle"
+                                  transform={`rotate(-90, ${x}, ${centerY})`}
+                                >
+                                  Average Attendance (Pengunjung / Event)
+                                </text>
+                              );
+                            }}
+                          />
                       <ZAxis type="number" dataKey="z" range={[1000, 3000]} name="Total Reach" />
                       
 
@@ -11890,6 +11906,8 @@ const Dashboard = ({
                       />
                     </ScatterChart>
                   </ResponsiveContainer>
+                    );
+                  })()}
                 </div>
 
                 {/* Right Side Legend: Sorted by Quadrant with Toggle Tooltip */}
@@ -17120,10 +17138,10 @@ const OverviewXAxisTick = (props: any) => {
         {nameLines.map((word: string, index: number) => (
           <tspan 
             x={0} 
-            dy={index === 0 ? 14 : 14} 
+            dy={index === 0 ? 11 : 11} 
             key={`word-overview-${index}`} 
             fill="#8E94B7" 
-            style={{ fontSize: "13px", fontWeight: 900 }}
+            style={{ fontSize: "10.5px", fontWeight: 800 }}
           >
             {word}
           </tspan>
