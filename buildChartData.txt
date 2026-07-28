@@ -1,0 +1,239 @@
+    // Generic helper to build grouped chart data by dimension
+    const buildChartData = (dimension: string, filterByMainKey?: string | null) => {
+      const gMap: Record<
+        string,
+        {
+          name: string;
+          pog: number;
+          stock: number;
+          sellIn: number;
+          sellOut: number;
+          opening: number;
+          idle: number;
+          budgetActivity: number;
+          actualActivity: number;
+          budgetNominal: number;
+          actualNominal: number;
+          budgetReach: number;
+          actualReach: number;
+        }
+      > = {};
+
+      const activityScale = activeActivityFilter ? 0.25 : 1.0;
+      const scaleFactor = (filterByMainKey ? 0.15 : 1.0) * activityScale;
+
+      if (dimension === "area") {
+        AREAS_LIST.forEach((area, idx) => {
+          const dummy = getDeterministicDummy(area, idx);
+          if (filterByMainKey || activeActivityFilter) {
+            dummy.pog = Math.round(dummy.pog * scaleFactor);
+            dummy.stock = Math.round(dummy.stock * scaleFactor);
+            dummy.sellIn = Math.round(dummy.sellIn * scaleFactor);
+            dummy.sellOut = Math.round(dummy.sellOut * scaleFactor);
+            dummy.opening = Math.round(dummy.opening * scaleFactor);
+            dummy.idle = Math.round(dummy.idle * scaleFactor);
+            dummy.budgetActivity = Math.round(dummy.budgetActivity * scaleFactor);
+            dummy.actualActivity = Math.round(dummy.actualActivity * scaleFactor);
+            dummy.budgetNominal = Math.round(dummy.budgetNominal * scaleFactor);
+            dummy.actualNominal = Math.round(dummy.actualNominal * scaleFactor);
+            dummy.budgetReach = Math.round(dummy.budgetReach * scaleFactor);
+            dummy.actualReach = Math.round(dummy.actualReach * scaleFactor);
+          }
+          gMap[area] = dummy;
+        });
+      } else if (dimension === "province") {
+        PROVINCES_LIST.forEach((prov, idx) => {
+          const dummy = getDeterministicDummy(prov, idx);
+          if (filterByMainKey || activeActivityFilter) {
+            dummy.pog = Math.round(dummy.pog * scaleFactor);
+            dummy.stock = Math.round(dummy.stock * scaleFactor);
+            dummy.sellIn = Math.round(dummy.sellIn * scaleFactor);
+            dummy.sellOut = Math.round(dummy.sellOut * scaleFactor);
+            dummy.opening = Math.round(dummy.opening * scaleFactor);
+            dummy.idle = Math.round(dummy.idle * scaleFactor);
+            dummy.budgetActivity = Math.round(dummy.budgetActivity * scaleFactor);
+            dummy.actualActivity = Math.round(dummy.actualActivity * scaleFactor);
+            dummy.budgetNominal = Math.round(dummy.budgetNominal * scaleFactor);
+            dummy.actualNominal = Math.round(dummy.actualNominal * scaleFactor);
+            dummy.budgetReach = Math.round(dummy.budgetReach * scaleFactor);
+            dummy.actualReach = Math.round(dummy.actualReach * scaleFactor);
+          }
+          gMap[prov] = dummy;
+        });
+      } else if (dimension === "sales_agronomist") {
+        SALES_AGRONOMISTS_LIST.forEach((sa, idx) => {
+          const dummy = getDeterministicDummy(sa, idx);
+          if (filterByMainKey || activeActivityFilter) {
+            dummy.pog = Math.round(dummy.pog * scaleFactor);
+            dummy.stock = Math.round(dummy.stock * scaleFactor);
+            dummy.sellIn = Math.round(dummy.sellIn * scaleFactor);
+            dummy.sellOut = Math.round(dummy.sellOut * scaleFactor);
+            dummy.opening = Math.round(dummy.opening * scaleFactor);
+            dummy.idle = Math.round(dummy.idle * scaleFactor);
+            dummy.budgetActivity = Math.round(dummy.budgetActivity * scaleFactor);
+            dummy.actualActivity = Math.round(dummy.actualActivity * scaleFactor);
+            dummy.budgetNominal = Math.round(dummy.budgetNominal * scaleFactor);
+            dummy.actualNominal = Math.round(dummy.actualNominal * scaleFactor);
+            dummy.budgetReach = Math.round(dummy.budgetReach * scaleFactor);
+            dummy.actualReach = Math.round(dummy.actualReach * scaleFactor);
+          }
+          gMap[sa] = dummy;
+        });
+      } else if (dimension === "hybrid" || dimension === "material") {
+        HYBRIDS_LIST.forEach((hyb, idx) => {
+          const dummy = getDeterministicDummy(hyb, idx);
+          if (filterByMainKey || activeActivityFilter) {
+            dummy.pog = Math.round(dummy.pog * scaleFactor);
+            dummy.stock = Math.round(dummy.stock * scaleFactor);
+            dummy.sellIn = Math.round(dummy.sellIn * scaleFactor);
+            dummy.sellOut = Math.round(dummy.sellOut * scaleFactor);
+            dummy.opening = Math.round(dummy.opening * scaleFactor);
+            dummy.idle = Math.round(dummy.idle * scaleFactor);
+            dummy.budgetActivity = Math.round(dummy.budgetActivity * scaleFactor);
+            dummy.actualActivity = Math.round(dummy.actualActivity * scaleFactor);
+            dummy.budgetNominal = Math.round(dummy.budgetNominal * scaleFactor);
+            dummy.actualNominal = Math.round(dummy.actualNominal * scaleFactor);
+            dummy.budgetReach = Math.round(dummy.budgetReach * scaleFactor);
+            dummy.actualReach = Math.round(dummy.actualReach * scaleFactor);
+          }
+          gMap[hyb] = dummy;
+        });
+      } else if (dimension === "activity") {
+        ACTIVITIES_LIST.forEach((act, idx) => {
+          const dummy = getDeterministicDummy(act, idx);
+          if (filterByMainKey || activeActivityFilter) {
+            dummy.pog = Math.round(dummy.pog * scaleFactor);
+            dummy.stock = Math.round(dummy.stock * scaleFactor);
+            dummy.sellIn = Math.round(dummy.sellIn * scaleFactor);
+            dummy.sellOut = Math.round(dummy.sellOut * scaleFactor);
+            dummy.opening = Math.round(dummy.opening * scaleFactor);
+            dummy.idle = Math.round(dummy.idle * scaleFactor);
+            dummy.budgetActivity = Math.round(dummy.budgetActivity * scaleFactor);
+            dummy.actualActivity = Math.round(dummy.actualActivity * scaleFactor);
+            dummy.budgetNominal = Math.round(dummy.budgetNominal * scaleFactor);
+            dummy.actualNominal = Math.round(dummy.actualNominal * scaleFactor);
+            dummy.budgetReach = Math.round(dummy.budgetReach * scaleFactor);
+            dummy.actualReach = Math.round(dummy.actualReach * scaleFactor);
+          }
+          gMap[act] = dummy;
+        });
+      }
+
+      pogDataOverviewFiltered.forEach((item) => {
+        // If activeActivityFilter is active, filter items by it!
+        const kioskCharSumForAct = (item.kiosk || "").split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+        const actIdxForAct = kioskCharSumForAct % ACTIVITIES_LIST.length;
+        const itemAct = ACTIVITIES_LIST[actIdxForAct];
+
+        if (activeActivityFilter && itemAct !== activeActivityFilter) {
+          return;
+        }
+
+        // If filterByMainKey is active, verify if item belongs to that main key
+        if (filterByMainKey) {
+          const itemPic = item.pic;
+          const rawPos = getFromRecord<string>(teamPositions, itemPic) || "";
+          const pos = normalizePosition(rawPos);
+          let belongs = false;
+
+          if (overviewGroupDimension === "area") {
+            const itemArea = item.area || "";
+            belongs = cleanForMatch(itemArea) === cleanForMatch(filterByMainKey);
+          } else if (overviewGroupDimension === "province") {
+            const itemProv = getFromRecord<string>(teamProvinces, itemPic) || item.province || "";
+            belongs = cleanForMatch(itemProv) === cleanForMatch(filterByMainKey);
+          } else if (overviewGroupDimension === "sales_agronomist") {
+            if (pos === "Sales Agronomist" && itemPic) {
+              belongs = cleanForMatch(itemPic) === cleanForMatch(filterByMainKey);
+            }
+          } else if (overviewGroupDimension === "hybrid" || overviewGroupDimension === "material") {
+            const itemHyb = item.hybrid || "";
+            belongs = cleanForMatch(itemHyb) === cleanForMatch(filterByMainKey);
+          } else if (overviewGroupDimension === "activity") {
+            const kioskCharSum = (item.kiosk || "").split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+            const actIdx = kioskCharSum % ACTIVITIES_LIST.length;
+            const act = ACTIVITIES_LIST[actIdx];
+            belongs = cleanForMatch(act) === cleanForMatch(filterByMainKey);
+          }
+
+          if (!belongs) return;
+        }
+
+        let gVal = "";
+        const itemPic = item.pic;
+        const rawPos = getFromRecord<string>(teamPositions, itemPic) || "";
+        const pos = normalizePosition(rawPos);
+
+        if (dimension === "area") {
+          const itemArea = item.area || "";
+          const matched = AREAS_LIST.find(a => cleanForMatch(a) === cleanForMatch(itemArea));
+          if (matched) gVal = matched;
+        } else if (dimension === "province") {
+          const itemProv = getFromRecord<string>(teamProvinces, itemPic) || item.province || "";
+          const matched = PROVINCES_LIST.find(p => cleanForMatch(p) === cleanForMatch(itemProv));
+          if (matched) gVal = matched;
+        } else if (dimension === "sales_agronomist") {
+          if (pos === "Sales Agronomist" && itemPic) {
+            const matched = SALES_AGRONOMISTS_LIST.find(sa => cleanForMatch(sa) === cleanForMatch(itemPic));
+            if (matched) gVal = matched;
+          }
+        } else if (dimension === "hybrid" || dimension === "material") {
+          const itemHyb = item.hybrid || "";
+          const matched = HYBRIDS_LIST.find(h => cleanForMatch(h) === cleanForMatch(itemHyb));
+          if (matched) gVal = matched;
+        } else if (dimension === "activity") {
+          const kioskCharSum = (item.kiosk || "").split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+          const actIdx = kioskCharSum % ACTIVITIES_LIST.length;
+          gVal = ACTIVITIES_LIST[actIdx];
+        }
+
+        if (gVal) {
+          if (!gMap[gVal]) {
+            gMap[gVal] = {
+              name: gVal,
+              pog: 0,
+              stock: 0,
+              sellIn: 0,
+              sellOut: 0,
+              opening: 0,
+              idle: 0,
+              budgetActivity: 0,
+              actualActivity: 0,
+              budgetNominal: 0,
+              actualNominal: 0,
+              budgetReach: 0,
+              actualReach: 0,
+            };
+          }
+          gMap[gVal].pog += Number(item.pog || 0);
+          gMap[gVal].stock += Number(item.currentQty || 0);
+          gMap[gVal].sellIn += Number(item.sellIn || 0);
+          gMap[gVal].sellOut += Number(item.sellOut || 0);
+          gMap[gVal].opening += Number(item.lastQty || 0);
+          gMap[gVal].idle += Number(item.idleStock || 0);
+        }
+      });
+
+      const activeMetric = (overviewMetricFilter === "overview" || overviewMetricFilter === "monitoring") ? overviewSubFilter : overviewMetricFilter;
+
+      const getMetricsForSort = (item: any) => {
+        let actual = 0;
+        let budget = 0;
+        if (activeMetric === "activity") {
+          actual = item.actualActivity || 0;
+          budget = item.budgetActivity || 0;
+        } else if (activeMetric === "nominal") {
+          actual = item.actualNominal || 0;
+          budget = item.budgetNominal || 0;
+        } else if (activeMetric === "reach") {
+          actual = item.actualReach || 0;
+          budget = item.budgetReach || 0;
+        } else if (activeMetric === "movement") {
+          actual = (item.sellIn || 0) + (item.pog || 0);
+          budget = item.sellOut || 0;
+        } else if (overviewMetricFilter === "idle") {
+          actual = item.idle || 0;
+          budget = 0;
+        } else if (overviewMetricFilter === "total_stock") {
+          actual = item.stock || 0;
+          budget = 0;

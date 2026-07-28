@@ -2701,6 +2701,11 @@ async function handleSaveAccessRules(body: any) {
   }
 }
 
+// Extremely fast overview caching variables
+let cachedOverviewData: any = null;
+let lastOverviewFetchTime: number = 0;
+let isFetchingOverview: boolean = false;
+
 // Main API Router Route
 app.all("/api", async (req, res) => {
   const action = (req.query.action || req.body?.action) as string;
@@ -2726,6 +2731,118 @@ app.all("/api", async (req, res) => {
       else if (action === "getEmployees") result = await handleGetEmployees();
       else if (action === "getInitialData")
         result = await handleGetInitialData(user);
+      else if (action === "getOverviewData") {
+        const fetchUrl = `https://script.google.com/macros/s/AKfycbxVCPzllBhLd8J-1UWeDJteFshrCs2M2PtehcXj7mHpW3PWfAcXe1d69NSkE9j3LYnM7A/exec?action=getOverviewData`;
+        const cachePath = path.join(process.cwd(), "local_overview_cache.json");
+
+        // 1. If we don't have it in memory, try to load from local file cache immediately
+        if (!cachedOverviewData) {
+          if (fs.existsSync(cachePath)) {
+            try {
+              const cacheText = fs.readFileSync(cachePath, "utf8");
+              cachedOverviewData = JSON.parse(cacheText);
+              console.log("[getOverviewData] Loaded cache file into memory successfully.");
+            } catch (cacheErr) {
+              console.error("[getOverviewData] Error loading cache file:", cacheErr);
+              // Clean up the corrupted cache file immediately so it doesn't cause errors next time
+              try {
+                if (fs.existsSync(cachePath)) {
+                  fs.unlinkSync(cachePath);
+                  console.log("[getOverviewData] Deleted corrupted cache file successfully.");
+                }
+              } catch (unlinkErr) {
+                console.error("[getOverviewData] Failed to delete corrupted cache file:", unlinkErr);
+              }
+            }
+          }
+        }
+
+        // 2. Set the result to the cached data if we have it
+        if (cachedOverviewData) {
+          result = cachedOverviewData;
+        }
+
+        // 3. Trigger background refresh if it is stale (older than 10 minutes) AND we are not already fetching
+        const now = Date.now();
+        if (!isFetchingOverview && (now - lastOverviewFetchTime > 10 * 60 * 1000 || !cachedOverviewData)) {
+          isFetchingOverview = true;
+          console.log("[getOverviewData] Cache is empty or stale. Triggering asynchronous background refresh from Google Apps Script...");
+
+          // Running as non-blocking background task
+          (async () => {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 120000); // Plenty of time for Google
+            try {
+              const resp = await fetch(fetchUrl, { signal: controller.signal });
+              clearTimeout(timeoutId);
+
+              if (resp.ok) {
+                const text = await resp.text();
+                const parsed = JSON.parse(text);
+                if (parsed && parsed.status === "success") {
+                  cachedOverviewData = parsed;
+                  lastOverviewFetchTime = Date.now();
+                  console.log("[getOverviewData] Background refresh succeeded. Cache updated.");
+                  
+                  // Atomic write to avoid corruption in case of crashes or interruptions
+                  const tempPath = cachePath + ".tmp";
+                  fs.writeFile(tempPath, text, "utf8", (err) => {
+                    if (err) {
+                      console.error("[getOverviewData] Error writing background temp cache file:", err);
+                      return;
+                    }
+                    fs.rename(tempPath, cachePath, (renameErr) => {
+                      if (renameErr) {
+                        console.error("[getOverviewData] Error renaming background cache file:", renameErr);
+                      }
+                    });
+                  });
+                } else {
+                  console.warn("[getOverviewData] Background fetch returned invalid status or format.");
+                }
+              } else {
+                console.warn(`[getOverviewData] Background fetch failed with HTTP status: ${resp.status}`);
+              }
+            } catch (err: any) {
+              clearTimeout(timeoutId);
+              console.warn(`[getOverviewData] Background refresh failed: ${err.message || err}`);
+            } finally {
+              isFetchingOverview = false;
+            }
+          })();
+        }
+
+        // 4. If we STILL don't have result (e.g. first boot and no cache file exists), wait for the initial fetch synchronously (safe fallback)
+        if (!result) {
+          console.log("[getOverviewData] First boot and no cache file. Waiting for Google Apps Script synchronously...");
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 120000);
+          try {
+            const resp = await fetch(fetchUrl, { signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (!resp.ok) throw new Error(`HTTP status ${resp.status}`);
+            const text = await resp.text();
+            const parsed = JSON.parse(text);
+            if (parsed && parsed.status === "success") {
+              cachedOverviewData = parsed;
+              lastOverviewFetchTime = Date.now();
+              
+              // Atomic write to avoid corruption
+              const tempPath = cachePath + ".tmp";
+              fs.writeFileSync(tempPath, text, "utf8");
+              fs.renameSync(tempPath, cachePath);
+              
+              result = parsed;
+            } else {
+              throw new Error("Invalid response format");
+            }
+          } catch (e: any) {
+            clearTimeout(timeoutId);
+            console.error("[getOverviewData] Synchronous initial fetch failed:", e.message || e);
+            result = { status: "error", message: `Fetch failed: ${e.message}` };
+          }
+        }
+      }
       else if (action === "getAccessRules")
         result = await handleGetAccessRules();
       else {

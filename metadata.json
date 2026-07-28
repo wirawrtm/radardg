@@ -1,9 +1,7 @@
 {
   "name": "RADAR DG",
-  "description": "",
-  "requestFramePermissions": [
-    "camera"
-  ],
+  "description": "National Performance & Reach Analysis Dashboard",
+  "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
   ]

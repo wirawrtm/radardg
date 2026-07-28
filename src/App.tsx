@@ -5,7 +5,6 @@ import React, {
   useMemo,
   useCallback,
 } from "react";
-import { Html5Qrcode } from "html5-qrcode";
 import { AdvantaLogo } from "./AdvantaLogo";
 import { UserIcon } from "./UserIcon";
 import { User } from "lucide-react";
@@ -774,153 +773,6 @@ const playBeep = () => {
   } catch (err) {
     console.warn("Could not play scan beep:", err);
   }
-};
-
-const QrScanModal = ({ isOpen, onClose, onScanSuccess }) => {
-  const [scannerError, setScannerError] = useState<string | null>(null);
-  const scannerRef = useRef<any>(null);
-
-  useEffect(() => {
-    if (!isOpen) {
-      setScannerError(null);
-      return;
-    }
-
-    let isScanningActive = false;
-    let html5QrCode: any = null;
-
-    const startCamera = async () => {
-      try {
-        html5QrCode = new Html5Qrcode("qr-camera-stream");
-        scannerRef.current = html5QrCode;
-
-        await html5QrCode.start(
-          { facingMode: "environment" },
-          {
-            fps: 15,
-            qrbox: (width, height) => {
-              const size = Math.min(width, height) * 0.95;
-              return { width: size, height: size };
-            },
-          },
-          (decodedText) => {
-            playBeep();
-            onScanSuccess(decodedText);
-            onClose();
-          },
-          () => {
-            // silent frame error check
-          },
-        );
-        isScanningActive = true;
-      } catch (err) {
-        console.error("Camera access error:", err);
-        setScannerError(
-          "Gagal mengakses kamera. Mohon berikan izin kamera pada browser Anda.",
-        );
-      }
-    };
-
-    const timer = setTimeout(() => {
-      startCamera();
-    }, 250);
-
-    return () => {
-      clearTimeout(timer);
-      if (html5QrCode) {
-        if (isScanningActive) {
-          html5QrCode.stop().catch((e) => console.log("Stop failed:", e));
-        }
-      }
-    };
-  }, [isOpen, onClose, onScanSuccess]);
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-[120] bg-[#181a2c]/80 backdrop-blur-md flex flex-col justify-center items-center p-6 animate-in fade-in duration-200">
-      <style>{`
-        #qr-camera-stream {
-          background-color: transparent !important;
-          border: none !important;
-        }
-        #qr-camera-stream video {
-          object-fit: cover !important;
-          width: 100% !important;
-          height: 100% !important;
-          border-radius: 22px !important;
-        }
-        #qr-camera-stream canvas {
-          display: none !important;
-        }
-        #qr-camera-stream img {
-          display: none !important;
-        }
-      `}</style>
-      <div className="bg-white w-full max-w-[340px] rounded-[32px] overflow-hidden shadow-[0_24px_64px_rgba(24,26,44,0.12)] border border-[#f0edff] p-6 flex flex-col items-center relative animate-in fade-in zoom-in-95 duration-250">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 size-8 rounded-full bg-[#f4f2ff] text-[#8E94B7] hover:text-red-500 hover:bg-red-50 transition-all flex items-center justify-center cursor-pointer z-10"
-        >
-          <span className="material-symbols-outlined text-lg">close</span>
-        </button>
-
-        <h3 className="text-base font-bold text-[#181a2c] tracking-wide mb-1 mt-2 text-center">
-          Pindai QR / Barcode
-        </h3>
-        <p className="text-[10px] text-[#8E94B7] font-bold uppercase tracking-wider text-center mb-6">
-          Arahkan kamera ke kode LOT
-        </p>
-
-        {/* Thick elegant gradient container matching the website's theme */}
-        <div className="relative w-full aspect-square max-w-[260px] p-[10px] rounded-[44px] bg-gradient-to-br from-primary to-cyan-400 shadow-[0_20px_48px_rgba(21,75,226,0.22)] flex items-center justify-center">
-          <div className="w-full h-full bg-white rounded-[34px] p-[12px] flex items-center justify-center relative overflow-hidden">
-            <div
-              id="qr-camera-stream"
-              className="w-full h-full object-cover rounded-[22px] overflow-hidden bg-slate-950"
-            ></div>
-
-            {!scannerError && (
-              <div className="absolute inset-[16px] pointer-events-none flex items-center justify-center z-10">
-                {/* Elegant scanning corners */}
-                <div className="absolute top-0 left-0 w-5 h-5 border-t-[3px] border-l-[3px] border-primary rounded-tl-md"></div>
-                <div className="absolute top-0 right-0 w-5 h-5 border-t-[3px] border-r-[3px] border-primary rounded-tr-md"></div>
-                <div className="absolute bottom-0 left-0 w-5 h-5 border-b-[3px] border-l-[3px] border-cyan-400 rounded-bl-md"></div>
-                <div className="absolute bottom-0 right-0 w-5 h-5 border-b-[3px] border-r-[3px] border-cyan-400 rounded-br-md"></div>
-
-                {/* Scanning laser line in matching gradient */}
-                <div
-                  className="w-[95%] h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent opacity-85 absolute animate-bounce"
-                  style={{ top: "15%", animationDuration: "2.5s" }}
-                ></div>
-              </div>
-            )}
-
-            {scannerError && (
-              <div className="absolute inset-0 bg-slate-950 text-white flex flex-col items-center justify-center p-4 text-center rounded-[22px] overflow-hidden">
-                <span className="material-symbols-outlined text-red-500 text-3xl mb-2">
-                  videocam_off
-                </span>
-                <p className="text-[11px] font-semibold select-none leading-relaxed text-slate-300">
-                  {scannerError}
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-6 w-full">
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full h-11 bg-[#f4f2ff] hover:bg-[#edecff] text-[#8E94B7] hover:text-[#181a2c] rounded-full font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
-          >
-            Tutup Kamera
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 };
 
 const PartnerEditModal = ({
@@ -1802,6 +1654,15 @@ const Dashboard = ({
   const [workingData, setWorkingData] = useState([]);
   const [rawWorkingData, setRawWorkingData] = useState([]);
   const [drSalesData, setDrSalesData] = useState<any[]>([]);
+  const [overviewApiData, setOverviewApiData] = useState<any[]>([]);
+  
+const safeNum = (val: any) => {
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  if (!val || typeof val !== 'string') return 0;
+  const parsed = parseFloat(val.replace(/[^0-9.-]/g, ''));
+  return isNaN(parsed) ? 0 : parsed;
+};
+
   const [deletedItems, setDeletedItems] = useState([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isChannelsLoading, setIsChannelsLoading] = useState(true);
@@ -2449,11 +2310,21 @@ const Dashboard = ({
   const [activeConversionActivity, setActiveConversionActivity] = useState("Farmer Meeting");
   const [isMonthDropdownOpen, setIsMonthDropdownOpen] = useState(false);
   const monthDropdownRef = useRef<HTMLDivElement>(null);
+  const [isHeaderMonthDropdownOpen, setIsHeaderMonthDropdownOpen] = useState(false);
+  const headerMonthDropdownRef = useRef<HTMLDivElement>(null);
+  const [isMetricDropdownOpen, setIsMetricDropdownOpen] = useState(false);
+  const metricDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (monthDropdownRef.current && !monthDropdownRef.current.contains(event.target as Node)) {
         setIsMonthDropdownOpen(false);
+      }
+      if (headerMonthDropdownRef.current && !headerMonthDropdownRef.current.contains(event.target as Node)) {
+        setIsHeaderMonthDropdownOpen(false);
+      }
+      if (metricDropdownRef.current && !metricDropdownRef.current.contains(event.target as Node)) {
+        setIsMetricDropdownOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -3297,7 +3168,7 @@ const Dashboard = ({
     const hour = new Date().getHours();
     if (hour >= 4 && hour < 11) {
       return {
-        text: "Selamat Pagi",
+        text: "Good Morning",
         imageUrl:
           "https://lh3.googleusercontent.com/d/1AzKb-75MaU9hppqSdy2rS93t0tAPGkGi",
         color: "text-amber-300",
@@ -3305,7 +3176,7 @@ const Dashboard = ({
     }
     if (hour >= 11 && hour < 15) {
       return {
-        text: "Selamat Siang",
+        text: "Good Day",
         imageUrl:
           "https://lh3.googleusercontent.com/d/1ZpNkT7R57FppIpyPuTt2w9QtJdIwwuRp",
         color: "text-yellow-300",
@@ -3313,14 +3184,14 @@ const Dashboard = ({
     }
     if (hour >= 15 && hour < 19) {
       return {
-        text: "Selamat Sore",
+        text: "Good Afternoon",
         imageUrl:
           "https://lh3.googleusercontent.com/d/12RsJXxDrH7aIAph0AJubB3i4w0gmkxcL",
         color: "text-orange-400",
       };
     }
     return {
-      text: "Selamat Malam",
+      text: "Good Evening",
       imageUrl:
         "https://lh3.googleusercontent.com/d/1wzqPdQ5jvw7fOF2X76kM56l9l-4mUcLx",
       color: "text-indigo-200",
@@ -3783,6 +3654,36 @@ const Dashboard = ({
 
     loadInitialData();
   }, [userData.name]);
+
+  useEffect(() => {
+    const fetchOverview = async () => {
+      try {
+        const url = "/api?action=getOverviewData";
+        const resp = await fetch(url);
+        if (!resp.ok) {
+           console.warn("Overview API not ready, using mock data");
+           setOverviewApiData([]);
+           return;
+        }
+        const text = await resp.text();
+        try {
+          const res = JSON.parse(text);
+          if (res.status === "success" && res.data) {
+            setOverviewApiData(res.data);
+          } else {
+            setOverviewApiData([]);
+          }
+        } catch (e) {
+          console.warn("Overview API returned non-JSON, using mock data");
+          setOverviewApiData([]);
+        }
+      } catch (e) {
+        console.warn("Failed to fetch overview API data, using mock data");
+        setOverviewApiData([]);
+      }
+    };
+    fetchOverview();
+  }, []);
 
   useEffect(() => {
     if (teamMembers.length > 1) {
@@ -4668,6 +4569,49 @@ const Dashboard = ({
     }
   }, [myKiosks, selectedKiosk]);
 
+  // Helper to parse working sheet month which is formatted as YYYY-DD-MM (e.g. 2026-01-04 for April 2026)
+  const parseWorkingMonth = (monthStr: any) => {
+    if (!monthStr) return null;
+    const INDO_MONTHS_LOCAL = [
+      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+      "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ];
+    
+    const partsSpace = String(monthStr).trim().split(" ");
+    if (partsSpace.length === 2) {
+      const mIdx = INDO_MONTHS_LOCAL.indexOf(partsSpace[0]);
+      const year = parseInt(partsSpace[1], 10);
+      if (mIdx >= 0 && !isNaN(year)) {
+        return { monthIndex: mIdx, year };
+      }
+    }
+
+    const datePart = String(monthStr).split("T")[0];
+    const partsDash = datePart.split("-");
+    if (partsDash.length === 3) {
+      const year = parseInt(partsDash[0], 10);
+      const day = parseInt(partsDash[1], 10);
+      const month = parseInt(partsDash[2], 10);
+      
+      if (day === 1 && ((year === 2026 && month >= 4) || (year === 2027 && month <= 3))) {
+        return {
+          monthIndex: month - 1,
+          year
+        };
+      }
+    }
+    
+    const dObj = new Date(monthStr);
+    if (!isNaN(dObj.getTime())) {
+      return {
+        monthIndex: dObj.getUTCMonth(),
+        year: dObj.getUTCFullYear()
+      };
+    }
+    
+    return null;
+  };
+
   // Fungsi Parser Tanggal POG
   const parseDateForPog = (timestamp) => {
     if (!timestamp) return new Date(0);
@@ -4885,27 +4829,18 @@ const Dashboard = ({
 
   // Dynamic filter options based on raw data
   const filterOptions = useMemo(() => {
-    const rawData =
-      rawWorkingData && rawWorkingData.length > 0 ? rawWorkingData : [];
-
+    const rawData = rawWorkingData && rawWorkingData.length > 0 ? rawWorkingData : [];
+    const overviewData = overviewApiData || [];
+    
     // 1. Months
     const monthsSet = new Set<string>();
     const defaultMonths = [
-      "April 2026",
-      "Mei 2026",
-      "Juni 2026",
-      "Juli 2026",
-      "Agustus 2026",
-      "September 2026",
-      "Oktober 2026",
-      "November 2026",
-      "Desember 2026",
-      "Januari 2027",
-      "Februari 2027",
-      "Maret 2027",
+      "April 2026", "Mei 2026", "Juni 2026", "Juli 2026",
+      "Agustus 2026", "September 2026", "Oktober 2026", "November 2026",
+      "Desember 2026", "Januari 2027", "Februari 2027", "Maret 2027"
     ];
     defaultMonths.forEach((m) => monthsSet.add(m));
-
+    
     rawData.forEach((d) => {
       if (d.timestamp) {
         const dateObj = parseDateForPog(d.timestamp);
@@ -4916,21 +4851,36 @@ const Dashboard = ({
         }
       }
     });
+    
+    
+    overviewData.forEach(d => {
+      if (d.month) {
+        const parsed = parseWorkingMonth(d.month);
+        if (parsed) {
+          monthsSet.add(`${INDO_MONTHS[parsed.monthIndex]} ${parsed.year}`);
+        } else {
+          monthsSet.add(d.month);
+        }
+      }
+    });
+
+    
     const months = Array.from(monthsSet).sort((a, b) => {
       const partsA = a.split(" ");
       const partsB = b.split(" ");
       const mIdxA = INDO_MONTHS.indexOf(partsA[0]);
       const mIdxB = INDO_MONTHS.indexOf(partsB[0]);
-      const yearA = parseInt(partsA[1], 10);
-      const yearB = parseInt(partsB[1], 10);
-      
+      const yearA = parseInt(partsA[1] || "0", 10);
+      const yearB = parseInt(partsB[1] || "0", 10);
       const getOrder = (mIdx: number, year: number) => {
         const seasonalYear = mIdx < 3 ? year - 1 : year;
         const seasonalMonthIdx = mIdx < 3 ? mIdx + 9 : mIdx - 3;
         return seasonalYear * 12 + seasonalMonthIdx;
       };
-      
-      return getOrder(mIdxA, yearA) - getOrder(mIdxB, yearB);
+      if (mIdxA >= 0 && mIdxB >= 0 && yearA > 0 && yearB > 0) {
+        return getOrder(mIdxA, yearA) - getOrder(mIdxB, yearB);
+      }
+      return a.localeCompare(b);
     });
 
     // 2. Channel (Category)
@@ -4946,53 +4896,67 @@ const Dashboard = ({
     rawData.forEach((d) => {
       if (d.hybrid) materialsSet.add(String(d.hybrid).trim());
     });
+    // From overviewApiData crops
+    overviewData.forEach(d => {
+      Object.keys(d).forEach(k => {
+        if (k.startsWith("bud ADV ") || k.startsWith("act ADV ")) {
+          const crop = k.replace("bud ADV ", "").replace("act ADV ", "").trim();
+          if (crop) materialsSet.add(crop);
+        }
+      });
+    });
+    
     const materials = Array.from(materialsSet).filter(Boolean).sort();
 
-    // 4. Team (PIC)
+    // 4. Team (PIC / SA / BS)
     const teamsSet = new Set<string>();
-    const DUMMY_SA_NAMES = [
-      "Rian Hidayat", "Agus Hermawan", "Dedi Setiawan", "Budi Santoso",
-      "Hendra Kurniawan", "Eko Prasetyo", "Andi Wijaya", "Slamet Riyadi",
-      "Yanto Subagyo", "Feri Nugroho", "Joko Susilo", "Rudi Hartono",
-      "Mulyono", "Setiawan", "Herianto", "Bambang", "Edi Purwanto", "Wawan"
-    ];
-    DUMMY_SA_NAMES.forEach(name => teamsSet.add(name));
     rawData.forEach((d) => {
       const cleanKName = cleanForMatch(d.kiosk);
-      const kInfo =
-        kiosks.find((k) => cleanForMatch(k.name) === cleanKName) || {};
+      const kInfo = kiosks.find((k) => cleanForMatch(k.name) === cleanKName) || {};
       const rawPic = normalizeName(String(d.user || kInfo.pic || "Unknown"));
       const pic = getDdaOfUser(rawPic, userData?.name, computedTeamProfiles);
       if (pic && pic !== "Unknown") teamsSet.add(String(pic).trim());
     });
+    
+    overviewData.forEach(d => {
+      if (d.sa && d.sa !== "-") teamsSet.add(String(d.sa).trim());
+      if (d.bs && d.bs !== "-") teamsSet.add(String(d.bs).trim());
+    });
+    
     const teams = Array.from(teamsSet).filter(Boolean).sort();
 
-    // 5. Area
+    // 5. Area / Territory
     const areasSet = new Set<string>();
-    ["T1", "T2", "T3", "T4", "T5", "T6", "T7"].forEach(area => areasSet.add(area));
+    
     if (employees && employees.length > 0) {
       employees.forEach((emp) => {
         const area = String(emp.area || "").trim();
-        if (area && area !== "-") {
-          areasSet.add(area);
-        }
-      });
-    } else {
-      rawData.forEach((d) => {
-        const cleanKName = cleanForMatch(d.kiosk);
-        const kInfo =
-          kiosks.find((k) => cleanForMatch(k.name) === cleanKName) || {};
-        const rawPic = normalizeName(String(d.user || kInfo.pic || "Unknown"));
-        const pic = getDdaOfUser(rawPic, userData?.name, computedTeamProfiles);
-        const matchedMember = teamMembers.find((m) => matchNames(m, pic));
-        const area =
-          getFromRecord<string>(teamAreas, matchedMember || pic) ||
-          kInfo.area ||
-          d.area;
-        if (area && area !== "-") areasSet.add(String(area).trim());
+        if (area && area !== "-") areasSet.add(area);
       });
     }
+    
+    rawData.forEach((d) => {
+      const cleanKName = cleanForMatch(d.kiosk);
+      const kInfo = kiosks.find((k) => cleanForMatch(k.name) === cleanKName) || {};
+      const rawPic = normalizeName(String(d.user || kInfo.pic || "Unknown"));
+      const pic = getDdaOfUser(rawPic, userData?.name, computedTeamProfiles);
+      const matchedMember = teamMembers.find((m) => matchNames(m, pic));
+      const area = getFromRecord<string>(teamAreas, matchedMember || pic) || kInfo.area || d.area;
+      if (area && area !== "-") areasSet.add(String(area).trim());
+    });
+    
+    overviewData.forEach(d => {
+      if (d.territory && d.territory !== "-") areasSet.add(String(d.territory).trim());
+    });
+    
     const areas = Array.from(areasSet).filter(Boolean).sort();
+
+    // 6. Activities
+    const activitiesSet = new Set<string>();
+    overviewData.forEach(d => {
+      if (d.activity && d.activity !== "-") activitiesSet.add(String(d.activity).trim());
+    });
+    const activities = Array.from(activitiesSet).filter(Boolean).sort();
 
     return {
       months,
@@ -5000,8 +4964,9 @@ const Dashboard = ({
       materials,
       teams,
       areas,
+      activities
     };
-  }, [rawWorkingData, kiosks, userData, teamMembers, teamAreas, employees]);
+  }, [rawWorkingData, overviewApiData, kiosks, userData, teamMembers, teamAreas, employees]);
 
   // Recalculate processed POG data base on selected month filter
   const pogDataProcessedForOverview = useMemo(() => {
@@ -5227,6 +5192,18 @@ const Dashboard = ({
   const pogDataOverviewFiltered = useMemo(() => {
     let result = pogDataProcessedForOverview;
 
+    // Filter: channel (Category)
+    if (filterBelowChannel && filterBelowChannel !== "All") {
+      result = result.filter((item) => {
+        const cleanKName = cleanForMatch(item.kiosk);
+        const kInfo = kiosks.find((k) => cleanForMatch(k.name) === cleanKName);
+        if (kInfo) {
+          return cleanForMatch(kInfo.category) === cleanForMatch(filterBelowChannel);
+        }
+        return false;
+      });
+    }
+
     // Filter 2: material (Hybrid)
     if (filterBelowMaterial && filterBelowMaterial !== "All") {
       result = result.filter(
@@ -5281,10 +5258,10 @@ const Dashboard = ({
     filterBelowArea,
     filterBelowCrop,
     filterBelowType,
+    kiosks,
   ]);
 
   const overviewHistoryData = useMemo(() => {
-    // Generate historical trends grouped by Month from April 2026 to March 2027
     const monthsSequence = [
       { key: "2026-04", label: "Apr 26", prop: "apr", monthIdx: 3, year: 2026 },
       { key: "2026-05", label: "Mei 26", prop: "mei", monthIdx: 4, year: 2026 },
@@ -5293,411 +5270,378 @@ const Dashboard = ({
       { key: "2026-08", label: "Ags 26", prop: "ags", monthIdx: 7, year: 2026 },
       { key: "2026-09", label: "Sep 26", prop: "sep", monthIdx: 8, year: 2026 },
       { key: "2026-10", label: "Okt 26", prop: "okt", monthIdx: 9, year: 2026 },
-      {
-        key: "2026-11",
-        label: "Nov 26",
-        prop: "nov",
-        monthIdx: 10,
-        year: 2026,
-      },
-      {
-        key: "2026-12",
-        label: "Des 26",
-        prop: "des",
-        monthIdx: 11,
-        year: 2026,
-      },
+      { key: "2026-11", label: "Nov 26", prop: "nov", monthIdx: 10, year: 2026 },
+      { key: "2026-12", label: "Des 26", prop: "des", monthIdx: 11, year: 2026 },
       { key: "2027-01", label: "Jan 27", prop: "jan", monthIdx: 0, year: 2027 },
       { key: "2027-02", label: "Feb 27", prop: "feb", monthIdx: 1, year: 2027 },
       { key: "2027-03", label: "Mar 27", prop: "mar", monthIdx: 2, year: 2027 },
     ];
 
-    const dummyDataByMonth: Record<string, {
-      budgetActivity: number;
-      actualActivity: number;
-      budgetNominal: number;
-      actualNominal: number;
-      budgetReach: number;
-      actualReach: number;
-    }> = {
-      "2026-04": { budgetActivity: 32, actualActivity: 30, budgetNominal: 48000000, actualNominal: 45000000, budgetReach: 1280, actualReach: 1200 },
-      "2026-05": { budgetActivity: 45, actualActivity: 42, budgetNominal: 67500000, actualNominal: 63000000, budgetReach: 1800, actualReach: 1680 },
-      "2026-06": { budgetActivity: 55, actualActivity: 52, budgetNominal: 82500000, actualNominal: 78000000, budgetReach: 2200, actualReach: 2080 },
-      "2026-07": { budgetActivity: 60, actualActivity: 58, budgetNominal: 90000000, actualNominal: 87000000, budgetReach: 2400, actualReach: 2320 },
-      "2026-08": { budgetActivity: 50, actualActivity: 47, budgetNominal: 75000000, actualNominal: 70500000, budgetReach: 2000, actualReach: 1880 },
-      "2026-09": { budgetActivity: 42, actualActivity: 39, budgetNominal: 63000000, actualNominal: 58500000, budgetReach: 1680, actualReach: 1560 },
-      "2026-10": { budgetActivity: 48, actualActivity: 44, budgetNominal: 72000000, actualNominal: 66000000, budgetReach: 1920, actualReach: 1760 },
-      "2026-11": { budgetActivity: 35, actualActivity: 32, budgetNominal: 52500000, actualNominal: 48000000, budgetReach: 1400, actualReach: 1280 },
-      "2026-12": { budgetActivity: 28, actualActivity: 25, budgetNominal: 42000000, actualNominal: 37500000, budgetReach: 1120, actualReach: 1000 },
-      "2027-01": { budgetActivity: 40, actualActivity: 37, budgetNominal: 60000000, actualNominal: 55500000, budgetReach: 1600, actualReach: 1480 },
-      "2027-02": { budgetActivity: 48, actualActivity: 45, budgetNominal: 72000000, actualNominal: 67500000, budgetReach: 1920, actualReach: 1800 },
-      "2027-03": { budgetActivity: 52, actualActivity: 49, budgetNominal: 78000000, actualNominal: 73500000, budgetReach: 2080, actualReach: 1960 },
-    };
-
-    const monthlyMap: Record<
-      string,
-      {
-        monthKey: string;
-        monthLabel: string;
-        name: string;
-        opening: number;
-        ending: number;
-        stockIn: number;
-        idle: number;
-        pog: number;
-        budgetActivity: number;
-        actualActivity: number;
-        budgetNominal: number;
-        actualNominal: number;
-        budgetReach: number;
-        actualReach: number;
-      }
-    > = {};
+    const monthlyMap: Record<string, any> = {};
     monthsSequence.forEach((item) => {
-      const dummy = dummyDataByMonth[item.key] || {
-        budgetActivity: 30,
-        actualActivity: 28,
-        budgetNominal: 45000000,
-        actualNominal: 42000000,
-        budgetReach: 1200,
-        actualReach: 1100,
-      };
       monthlyMap[item.key] = {
         monthKey: item.key,
         monthLabel: item.label,
         name: item.label,
-        opening: 100,
-        ending: 100,
-        stockIn: 50,
-        idle: 20,
-        pog: 50,
-        budgetActivity: dummy.budgetActivity,
-        actualActivity: dummy.actualActivity,
-        budgetNominal: dummy.budgetNominal,
-        actualNominal: dummy.actualNominal,
-        budgetReach: dummy.budgetReach,
-        actualReach: dummy.actualReach,
+        opening: 0,
+        ending: 0,
+        stockIn: 0,
+        idle: 0,
+        pog: 0,
+        budgetActivity: 0,
+        actualActivity: 0,
+        budgetNominal: 0,
+        actualNominal: 0,
+        budgetReach: 0,
+        actualReach: 0,
       };
     });
 
-    rawWorkingData.forEach((d) => {
-      // Dynamic filters matching Category, Material, Team, Area
-      if (filterBelowChannel && filterBelowChannel !== "All") {
-        const kName = cleanForMatch(d.kiosk);
-        const kInfo = kiosks.find((k) => cleanForMatch(k.name) === kName);
-        if (
-          !kInfo ||
-          cleanForMatch(kInfo.category || d.category) !==
-            cleanForMatch(filterBelowChannel)
-        ) {
-          return;
+    let filteredData = overviewApiData || [];
+    if (filterBelowMonth && filterBelowMonth.length > 0) {
+      filteredData = filteredData.filter(d => {
+        if (!d.month) return false;
+        const parsed = parseWorkingMonth(d.month);
+        if (parsed) {
+          const formatted = `${INDO_MONTHS[parsed.monthIndex]} ${parsed.year}`;
+          return filterBelowMonth.includes(formatted);
         }
-      }
-      if (filterBelowMaterial && filterBelowMaterial !== "All") {
-        if (cleanForMatch(d.hybrid) !== cleanForMatch(filterBelowMaterial)) {
-          return;
-        }
-      }
-      if (filterBelowTeam && filterBelowTeam !== "All") {
-        const kName = cleanForMatch(d.kiosk);
-        const kInfo = kiosks.find((k) => cleanForMatch(k.name) === kName) || {};
-        const rawPic = normalizeName(String(d.user || kInfo.pic || "Unknown"));
-        const pic = getDdaOfUser(
-          rawPic,
-          userData?.name,
-          computedTeamProfiles,
-        );
-        if (cleanForMatch(pic) !== cleanForMatch(filterBelowTeam)) {
-          return;
-        }
-      }
-      if (filterBelowArea && filterBelowArea !== "All") {
-        const kName = cleanForMatch(d.kiosk);
-        const kInfo = kiosks.find((k) => cleanForMatch(k.name) === kName) || {};
-        const rawPic = normalizeName(String(d.user || kInfo.pic || "Unknown"));
-        const pic = getDdaOfUser(
-          rawPic,
-          userData?.name,
-          computedTeamProfiles,
-        );
-        const matchedMember = teamMembers.find((m) => matchNames(m, pic));
-        const area =
-          getFromRecord<string>(teamAreas, matchedMember || pic) ||
-          kInfo.area ||
-          d.area ||
-          "-";
-        if (cleanForMatch(area) !== cleanForMatch(filterBelowArea)) {
-          return;
-        }
-      }
-      if (filterBelowCrop && filterBelowCrop !== "All") {
-        const itemCrop =
-          d.crops || d.Crops || d.crop || d.Crop || d.CROP || d.CROPS || "";
-        if (!checkCropMatch(itemCrop, filterBelowCrop)) {
-          return;
-        }
-      }
-
-      // Find max POG across months to estimate capacity
-      let maxPogForKiosk = 0;
-      monthsSequence.forEach((cfg) => {
-        const val = Number((d as any)[cfg.prop]) || 0;
-        if (val > maxPogForKiosk) maxPogForKiosk = val;
+        return filterBelowMonth.includes(d.month);
       });
-      if (maxPogForKiosk === 0) maxPogForKiosk = 100; // default baseline
-
-      // Initialize sequential inventory simulation for this specific channel partner
-      let currentOpening = Math.round(maxPogForKiosk * 1.5 + 40);
-
-      monthsSequence.forEach((cfg) => {
-        const pogVal = Number((d as any)[cfg.prop]) || 0;
-        const stockInVal = Math.round(pogVal * 1.08 + (pogVal > 0 ? 12 : 3));
-        const endingVal = Math.max(0, currentOpening + stockInVal - pogVal);
-        const idleVal = Math.min(
-          endingVal,
-          Math.round(currentOpening * 0.15 + 8),
-        );
-
-        monthlyMap[cfg.key].opening += currentOpening;
-        monthlyMap[cfg.key].ending += endingVal;
-        monthlyMap[cfg.key].stockIn += stockInVal;
-        monthlyMap[cfg.key].idle += idleVal;
-        monthlyMap[cfg.key].pog += pogVal;
-
-        monthlyMap[cfg.key].actualActivity += pogVal;
-        monthlyMap[cfg.key].budgetActivity += Math.round(pogVal * 1.15 + (pogVal > 0 ? 5 : 2));
-        monthlyMap[cfg.key].actualNominal += Math.round(pogVal * 1.12) * 150000;
-        monthlyMap[cfg.key].budgetNominal += Math.round(pogVal * 1.15 + (pogVal > 0 ? 5 : 2)) * 150000;
-        monthlyMap[cfg.key].actualReach += Math.round(pogVal * 0.8 * 1.05);
-        monthlyMap[cfg.key].budgetReach += Math.round(pogVal * 1.15 + (pogVal > 0 ? 5 : 2)) * 0.8;
-
-        currentOpening = endingVal;
+    }
+    if (activeActivityFilter && activeActivityFilter !== "All") {
+      filteredData = filteredData.filter(d => cleanForMatch(d.activity) === cleanForMatch(activeActivityFilter));
+    }
+    if (filterBelowTeam && filterBelowTeam !== "All") {
+      filteredData = filteredData.filter(d => cleanForMatch(d.sa) === cleanForMatch(filterBelowTeam) || cleanForMatch(d.bs) === cleanForMatch(filterBelowTeam));
+    }
+    if (filterBelowArea && filterBelowArea !== "All") {
+      filteredData = filteredData.filter(d => {
+        return cleanForMatch(d.territory || "") === cleanForMatch(filterBelowArea);
       });
+    }
+    if (filterBelowCrop && filterBelowCrop !== "All") {
+      filteredData = filteredData.filter(d => {
+        const budKey = `bud ADV ${filterBelowCrop}`;
+        const actKey = `act ADV ${filterBelowCrop}`;
+        return safeNum(d[budKey]) > 0 || safeNum(d[actKey]) > 0;
+      });
+    }
+    if (filterBelowChannel && filterBelowChannel !== "All") {
+      const activePics = new Set(
+        kiosks
+          .filter(k => cleanForMatch(k.category) === cleanForMatch(filterBelowChannel))
+          .map(k => cleanForMatch(k.pic))
+          .filter(Boolean)
+      );
+      filteredData = filteredData.filter((d) => {
+        return activePics.has(cleanForMatch(d.sa)) || activePics.has(cleanForMatch(d.bs));
+      });
+    }
+    if (filterBelowMaterial && filterBelowMaterial !== "All") {
+      filteredData = filteredData.filter((d) => {
+        const mClean = filterBelowMaterial.toLowerCase().replace(/[^a-z0-9]/g, '');
+        let hasValue = false;
+        Object.keys(d).forEach(k => {
+          const cleanK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (cleanK.includes(mClean) && (cleanK.startsWith("bud") || cleanK.startsWith("act"))) {
+            if (safeNum(d[k]) > 0) hasValue = true;
+          }
+        });
+        return hasValue;
+      });
+    }
+    if (filterBelowType && filterBelowType !== "All") {
+      filteredData = filteredData.filter((d) => {
+        const actClean = (d.activity || "").toLowerCase();
+        const isRegular = actClean.includes("farmer field day") || 
+                          actClean.includes("farmers meeting") || 
+                          actClean.includes("farmer meeting") || 
+                          actClean.includes("open demo plot") || 
+                          actClean.includes("small field trial") || 
+                          actClean.includes("product trial") ||
+                          actClean === "ffd" ||
+                          actClean === "fm" ||
+                          actClean === "odp" ||
+                          actClean === "sft" ||
+                          actClean === "pt";
+        return filterBelowType === "Regular" ? isRegular : !isRegular;
+      });
+    }
+
+    filteredData.forEach(item => {
+       const parsed = parseWorkingMonth(item.month);
+       let key = "";
+       if (parsed) {
+         key = `${parsed.year}-${(parsed.monthIndex + 1).toString().padStart(2, '0')}`;
+       }
+       if (monthlyMap[key]) {
+           monthlyMap[key].budgetActivity += safeNum(item.budgetActivity);
+           monthlyMap[key].actualActivity += safeNum(item.actualActivity);
+           monthlyMap[key].budgetNominal += safeNum(item.amountBudget);
+           monthlyMap[key].actualNominal += safeNum(item.actualAmount);
+           monthlyMap[key].budgetReach += safeNum(item.budgetFarmerReach);
+           monthlyMap[key].actualReach += safeNum(item.farmerReach);
+           monthlyMap[key].pog += safeNum(item.directSales);
+       }
     });
 
-    return monthsSequence.map((cfg) => monthlyMap[cfg.key]);
+    let finalMonths = Object.values(monthlyMap);
+    if (filterBelowMonth && filterBelowMonth.length > 0) {
+      finalMonths = finalMonths.filter(m => {
+        const parts = m.monthKey.split("-");
+        const year = parseInt(parts[0], 10);
+        const monthIdx = parseInt(parts[1], 10) - 1;
+        const formatted = `${INDO_MONTHS[monthIdx]} ${year}`;
+        return filterBelowMonth.includes(formatted);
+      });
+    }
+
+    return finalMonths;
   }, [
-    rawWorkingData,
-    kiosks,
+    overviewApiData,
+    activeActivityFilter,
+    filterBelowTeam,
+    filterBelowArea,
+    filterBelowMonth,
+    filterBelowCrop,
     filterBelowChannel,
     filterBelowMaterial,
+    filterBelowType,
+    teamAreas,
+    kiosks,
+  ]);
+
+  // overviewTotals
+  const overviewTotals = useMemo(() => {
+    let activityActual = 0, activityBudget = 0;
+    let nominalActual = 0, nominalBudget = 0;
+    let reachActual = 0, reachBudget = 0;
+    let filteredData = overviewApiData || [];
+    if (filterBelowMonth && filterBelowMonth.length > 0) {
+      filteredData = filteredData.filter(d => {
+        if (!d.month) return false;
+        const parsed = parseWorkingMonth(d.month);
+        if (parsed) {
+          const formatted = `${INDO_MONTHS[parsed.monthIndex]} ${parsed.year}`;
+          return filterBelowMonth.includes(formatted);
+        }
+        return filterBelowMonth.includes(d.month);
+      });
+    }
+    if (activeActivityFilter && activeActivityFilter !== "All") {
+      filteredData = filteredData.filter(d => cleanForMatch(d.activity) === cleanForMatch(activeActivityFilter));
+    }
+    if (filterBelowTeam && filterBelowTeam !== "All") {
+      filteredData = filteredData.filter(d => cleanForMatch(d.sa) === cleanForMatch(filterBelowTeam) || cleanForMatch(d.bs) === cleanForMatch(filterBelowTeam));
+    }
+    if (filterBelowArea && filterBelowArea !== "All") {
+      filteredData = filteredData.filter(d => {
+        return cleanForMatch(d.territory || "") === cleanForMatch(filterBelowArea);
+      });
+    }
+    if (filterBelowCrop && filterBelowCrop !== "All") {
+      filteredData = filteredData.filter(d => {
+        const budKey = `bud ADV ${filterBelowCrop}`;
+        const actKey = `act ADV ${filterBelowCrop}`;
+        return safeNum(d[budKey]) > 0 || safeNum(d[actKey]) > 0;
+      });
+    }
+    if (filterBelowChannel && filterBelowChannel !== "All") {
+      const activePics = new Set(
+        kiosks
+          .filter(k => cleanForMatch(k.category) === cleanForMatch(filterBelowChannel))
+          .map(k => cleanForMatch(k.pic))
+          .filter(Boolean)
+      );
+      filteredData = filteredData.filter((d) => {
+        return activePics.has(cleanForMatch(d.sa)) || activePics.has(cleanForMatch(d.bs));
+      });
+    }
+    if (filterBelowMaterial && filterBelowMaterial !== "All") {
+      filteredData = filteredData.filter((d) => {
+        const mClean = filterBelowMaterial.toLowerCase().replace(/[^a-z0-9]/g, '');
+        let hasValue = false;
+        Object.keys(d).forEach(k => {
+          const cleanK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (cleanK.includes(mClean) && (cleanK.startsWith("bud") || cleanK.startsWith("act"))) {
+            if (safeNum(d[k]) > 0) hasValue = true;
+          }
+        });
+        return hasValue;
+      });
+    }
+    if (filterBelowType && filterBelowType !== "All") {
+      filteredData = filteredData.filter((d) => {
+        const actClean = (d.activity || "").toLowerCase();
+        const isRegular = actClean.includes("farmer field day") || 
+                          actClean.includes("farmers meeting") || 
+                          actClean.includes("farmer meeting") || 
+                          actClean.includes("open demo plot") || 
+                          actClean.includes("small field trial") || 
+                          actClean.includes("product trial") ||
+                          actClean === "ffd" ||
+                          actClean === "fm" ||
+                          actClean === "odp" ||
+                          actClean === "sft" ||
+                          actClean === "pt";
+        return filterBelowType === "Regular" ? isRegular : !isRegular;
+      });
+    }
+
+    filteredData.forEach(item => {
+      activityActual += safeNum(item.actualActivity);
+      activityBudget += safeNum(item.budgetActivity);
+      nominalActual += safeNum(item.actualAmount);
+      nominalBudget += safeNum(item.amountBudget);
+      reachActual += safeNum(item.farmerReach);
+      reachBudget += safeNum(item.budgetFarmerReach);
+    });
+    return {
+      activity: { actual: activityActual, budget: activityBudget },
+      nominal: { actual: nominalActual, budget: nominalBudget },
+      reach: { actual: reachActual, budget: reachBudget },
+    };
+  }, [
+    overviewApiData,
+    filterBelowMonth,
+    activeActivityFilter,
     filterBelowTeam,
     filterBelowArea,
     filterBelowCrop,
-    userData,
-    teamMembers,
-    teamAreas,
+    filterBelowChannel,
+    filterBelowMaterial,
+    filterBelowType,
+    kiosks,
   ]);
 
+  // activityDonutCardsData
   const activityDonutCardsData = useMemo(() => {
-    const REGULAR_LIST = ["FFD", "FM", "ODP", "SFT", "BC", "PT"];
-    const ADHOC_LIST = ["BFFD", "BFM", "BFT", "CRV", "EXP"];
-    let ACTIVITIES_LIST = ["FFD", "FM", "ODP", "SFT", "BFFD", "BFM", "BFT", "BC", "CRV", "EXP", "PT"];
-    if (filterBelowType === "Regular") {
-      ACTIVITIES_LIST = REGULAR_LIST;
-    } else if (filterBelowType === "AdHoc") {
-      ACTIVITIES_LIST = ADHOC_LIST;
+    let filteredData = overviewApiData || [];
+    
+    // Apply filters except Activity filter
+    if (filterBelowMonth && filterBelowMonth.length > 0) {
+      filteredData = filteredData.filter(d => {
+        if (!d.month) return false;
+        const parsed = parseWorkingMonth(d.month);
+        if (parsed) {
+          const formatted = `${INDO_MONTHS[parsed.monthIndex]} ${parsed.year}`;
+          return filterBelowMonth.includes(formatted);
+        }
+        return filterBelowMonth.includes(d.month);
+      });
+    }
+    if (filterBelowTeam && filterBelowTeam !== "All") {
+      filteredData = filteredData.filter(d => cleanForMatch(d.sa) === cleanForMatch(filterBelowTeam) || cleanForMatch(d.bs) === cleanForMatch(filterBelowTeam));
+    }
+    if (filterBelowArea && filterBelowArea !== "All") {
+      filteredData = filteredData.filter(d => {
+        return cleanForMatch(d.territory || "") === cleanForMatch(filterBelowArea);
+      });
+    }
+    if (filterBelowCrop && filterBelowCrop !== "All") {
+      filteredData = filteredData.filter(d => {
+        const budKey = `bud ADV ${filterBelowCrop}`;
+        const actKey = `act ADV ${filterBelowCrop}`;
+        return safeNum(d[budKey]) > 0 || safeNum(d[actKey]) > 0;
+      });
+    }
+    if (filterBelowChannel && filterBelowChannel !== "All") {
+      const activePics = new Set(
+        kiosks
+          .filter(k => cleanForMatch(k.category) === cleanForMatch(filterBelowChannel))
+          .map(k => cleanForMatch(k.pic))
+          .filter(Boolean)
+      );
+      filteredData = filteredData.filter((d) => {
+        return activePics.has(cleanForMatch(d.sa)) || activePics.has(cleanForMatch(d.bs));
+      });
+    }
+    if (filterBelowMaterial && filterBelowMaterial !== "All") {
+      filteredData = filteredData.filter((d) => {
+        const mClean = filterBelowMaterial.toLowerCase().replace(/[^a-z0-9]/g, '');
+        let hasValue = false;
+        Object.keys(d).forEach(k => {
+          const cleanK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (cleanK.includes(mClean) && (cleanK.startsWith("bud") || cleanK.startsWith("act"))) {
+            if (safeNum(d[k]) > 0) hasValue = true;
+          }
+        });
+        return hasValue;
+      });
+    }
+    if (filterBelowType && filterBelowType !== "All") {
+      filteredData = filteredData.filter((d) => {
+        const actClean = (d.activity || "").toLowerCase();
+        const isRegular = actClean.includes("farmer field day") || 
+                          actClean.includes("farmers meeting") || 
+                          actClean.includes("farmer meeting") || 
+                          actClean.includes("open demo plot") || 
+                          actClean.includes("small field trial") || 
+                          actClean.includes("product trial") ||
+                          actClean === "ffd" ||
+                          actClean === "fm" ||
+                          actClean === "odp" ||
+                          actClean === "sft" ||
+                          actClean === "pt";
+        return filterBelowType === "Regular" ? isRegular : !isRegular;
+      });
     }
 
-    const ORIGINAL_ACTIVITIES_LIST = ["FFD", "FM", "ODP", "SFT", "BFFD", "BFM", "BFT", "BC", "CRV", "EXP", "PT"];
+    const activityMap: Record<string, any> = {};
+    let totalActual = 0;
+    let totalBudget = 0;
+    
+    const isNominal = overviewMetricFilter === "nominal";
+    const isReach = overviewMetricFilter === "reach";
 
-    const totals: Record<string, { budgetActivity: number; actualActivity: number; budgetNominal: number; actualNominal: number; budgetReach: number; actualReach: number }> = {
-      FFD: { budgetActivity: 120, actualActivity: 95, budgetNominal: 150000000, actualNominal: 125000000, budgetReach: 3000, actualReach: 2400 },
-      FM: { budgetActivity: 250, actualActivity: 210, budgetNominal: 320000000, actualNominal: 280000000, budgetReach: 6250, actualReach: 5250 },
-      ODP: { budgetActivity: 80, actualActivity: 72, budgetNominal: 90000000, actualNominal: 81000000, budgetReach: 2000, actualReach: 1800 },
-      SFT: { budgetActivity: 150, actualActivity: 130, budgetNominal: 180000000, actualNominal: 162000000, budgetReach: 3750, actualReach: 3250 },
-      BFFD: { budgetActivity: 60, actualActivity: 45, budgetNominal: 90000000, actualNominal: 70000000, budgetReach: 1500, actualReach: 1125 },
-      BFM: { budgetActivity: 110, actualActivity: 90, budgetNominal: 160000000, actualNominal: 130000000, budgetReach: 2750, actualReach: 2250 },
-      BFT: { budgetActivity: 45, actualActivity: 38, budgetNominal: 75000000, actualNominal: 65000000, budgetReach: 1125, actualReach: 950 },
-      BC: { budgetActivity: 200, actualActivity: 175, budgetNominal: 120000000, actualNominal: 105000000, budgetReach: 5000, actualReach: 4375 },
-      CRV: { budgetActivity: 70, actualActivity: 58, budgetNominal: 110000000, actualNominal: 95000000, budgetReach: 1750, actualReach: 1450 },
-      EXP: { budgetActivity: 30, actualActivity: 24, budgetNominal: 140000000, actualNominal: 115000000, budgetReach: 750, actualReach: 600 },
-      PT: { budgetActivity: 95, actualActivity: 82, budgetNominal: 55000000, actualNominal: 48000000, budgetReach: 2375, actualReach: 2050 },
-    };
-
-    pogDataOverviewFiltered.forEach((item) => {
-      const kioskCharSum = (item.kiosk || "").split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
-      const seedVal = kioskCharSum % 100;
-      const actIdx = kioskCharSum % ORIGINAL_ACTIVITIES_LIST.length;
-      const actName = ORIGINAL_ACTIVITIES_LIST[actIdx];
-
-      const rowBudAct = 1 + (seedVal % 4);
-      const rowActAct = Math.round(rowBudAct * (0.8 + (seedVal % 20) / 100));
-
-      const rowBudNom = (2000000 + (seedVal * 150000) % 15000000);
-      const rowActNom = Math.round(rowBudNom * (0.82 + (seedVal % 18) / 100));
-
-      const rowBudReach = rowBudAct * (20 + (seedVal % 15));
-      const rowActReach = Math.round(rowBudReach * (0.8 + (seedVal % 20) / 100));
-
-      if (totals[actName]) {
-        totals[actName].budgetActivity += rowBudAct;
-        totals[actName].actualActivity += rowActAct;
-        totals[actName].budgetNominal += rowBudNom;
-        totals[actName].actualNominal += rowActNom;
-        totals[actName].budgetReach += rowBudReach;
-        totals[actName].actualReach += rowActReach;
+    filteredData.forEach(item => {
+      const actName = item.activity || "Unknown";
+      if (!activityMap[actName]) {
+        activityMap[actName] = { name: actName, actual: 0, budget: 0 };
       }
-    });
-
-    const activeTotals = Object.keys(totals)
-      .filter((k) => ACTIVITIES_LIST.includes(k))
-      .map((k) => totals[k]);
-
-    const totalBudgetAct = activeTotals.reduce((sum, t) => sum + t.budgetActivity, 0);
-    const totalActualAct = activeTotals.reduce((sum, t) => sum + t.actualActivity, 0);
-    const totalBudgetNom = activeTotals.reduce((sum, t) => sum + t.budgetNominal, 0);
-    const totalActualNom = activeTotals.reduce((sum, t) => sum + t.actualNominal, 0);
-    const totalBudgetReach = activeTotals.reduce((sum, t) => sum + t.budgetReach, 0);
-    const totalActualReach = activeTotals.reduce((sum, t) => sum + t.actualReach, 0);
-
-    const listToMap = ["TOTAL", ...ACTIVITIES_LIST];
-
-    return listToMap.map((name) => {
-      const isNominal = overviewMetricFilter === "nominal";
-      const isReach = overviewMetricFilter === "reach";
-      let budget = 0;
-      let actual = 0;
-      if (name === "TOTAL") {
-        budget = isNominal ? totalBudgetNom : isReach ? totalBudgetReach : totalBudgetAct;
-        actual = isNominal ? totalActualNom : isReach ? totalActualReach : totalActualAct;
-      } else {
-        const t = totals[name];
-        budget = isNominal ? t.budgetNominal : isReach ? t.budgetReach : t.budgetActivity;
-        actual = isNominal ? t.actualNominal : isReach ? t.actualReach : t.actualActivity;
-      }
-
-      const pct = budget > 0 ? Math.round((actual / budget) * 100) : 0;
-
-      let actualStr = "";
-      let budgetStr = "";
+      
+      let actVal = safeNum(item.actualActivity);
+      let budVal = safeNum(item.budgetActivity);
+      
       if (isNominal) {
-        if (actual >= 1000000000) actualStr = `${(actual / 1000000000).toFixed(1)}M`;
-        else if (actual >= 1000000) actualStr = `${(actual / 1000000).toFixed(0)}Jt`;
-        else actualStr = `${actual.toLocaleString()}`;
-
-        if (budget >= 1000000000) budgetStr = `${(budget / 1000000000).toFixed(1)}M`;
-        else if (budget >= 1000000) budgetStr = `${(budget / 1000000).toFixed(0)}Jt`;
-        else budgetStr = `${budget.toLocaleString()}`;
+         actVal = safeNum(item.actualAmount);
+         budVal = safeNum(item.amountBudget);
       } else if (isReach) {
-        if (actual >= 1000000) actualStr = `${(actual / 1000000).toFixed(1)}M`;
-        else if (actual >= 1000) actualStr = `${(actual / 1000).toFixed(1)}K`;
-        else actualStr = `${actual.toLocaleString()}`;
-
-        if (budget >= 1000000) budgetStr = `${(budget / 1000000).toFixed(1)}M`;
-        else if (budget >= 1000) budgetStr = `${(budget / 1000).toFixed(1)}K`;
-        else budgetStr = `${budget.toLocaleString()}`;
-      } else {
-        actualStr = `${actual}`;
-        budgetStr = `${budget}`;
+         actVal = safeNum(item.farmerReach);
+         budVal = safeNum(item.budgetFarmerReach);
       }
-
-      const remaining = Math.max(0, budget - actual);
-      const chartData = [
-        { name: "Actual", value: actual, fill: name === "TOTAL" ? "#f59e0b" : "#06b6d4" },
-        { name: "Remaining", value: remaining, fill: "#f1f5f9" }
-      ];
-
-      if (actual > budget) {
-        chartData[0].value = actual;
-        chartData[1].value = 0;
-      }
-
-      return {
-        name,
-        fullName: name === "FFD" ? "Farmer Field Day" :
-                  name === "FM" ? "Farmer Meeting" :
-                  name === "ODP" ? "One Day Promo" :
-                  name === "SFT" ? "Special Field Trip" :
-                  name === "BFFD" ? "Big Farmer Field Day" :
-                  name === "BFM" ? "Big Farmer Meeting" :
-                  name === "BFT" ? "Big Field Trip" :
-                  name === "BC" ? "Branding Crop" :
-                  name === "CRV" ? "Caravan" :
-                  name === "EXP" ? "Expo" :
-                  name === "PT" ? "Pasar Tani" : "Total Activity",
-        budget,
-        actual,
-        actualStr,
-        budgetStr,
-        percentage: pct,
-        chartData
-      };
+      
+      activityMap[actName].actual += actVal;
+      activityMap[actName].budget += budVal;
+      
+      totalActual += actVal;
+      totalBudget += budVal;
     });
-  }, [pogDataOverviewFiltered, overviewMetricFilter, filterBelowType]);
+
+    const result = [
+      { name: "TOTAL", actual: totalActual, budget: totalBudget },
+      ...Object.values(activityMap).sort((a, b) => b.actual - a.actual)
+    ];
+    
+    return result;
+  }, [
+    overviewApiData,
+    filterBelowMonth,
+    filterBelowTeam,
+    filterBelowArea,
+    filterBelowCrop,
+    filterBelowChannel,
+    filterBelowMaterial,
+    filterBelowType,
+    overviewMetricFilter,
+    kiosks,
+  ]);
 
   const chartMetric = (overviewMetricFilter === "overview" || overviewMetricFilter === "monitoring") ? overviewSubFilter : overviewMetricFilter;
 
-  const overviewTotals = useMemo(() => {
-    const REGULAR_LIST = ["FFD", "FM", "ODP", "SFT", "BC", "PT"];
-    const ADHOC_LIST = ["BFFD", "BFM", "BFT", "CRV", "EXP"];
-    let ACTIVITIES_LIST = ["FFD", "FM", "ODP", "SFT", "BFFD", "BFM", "BFT", "BC", "CRV", "EXP", "PT"];
-    if (filterBelowType === "Regular") {
-      ACTIVITIES_LIST = REGULAR_LIST;
-    } else if (filterBelowType === "AdHoc") {
-      ACTIVITIES_LIST = ADHOC_LIST;
-    }
 
-    const ORIGINAL_ACTIVITIES_LIST = ["FFD", "FM", "ODP", "SFT", "BFFD", "BFM", "BFT", "BC", "CRV", "EXP", "PT"];
-
-    const totals = {
-      FFD: { budgetActivity: 120, actualActivity: 95, budgetNominal: 150000000, actualNominal: 125000000, budgetReach: 3000, actualReach: 2400 },
-      FM: { budgetActivity: 250, actualActivity: 210, budgetNominal: 320000000, actualNominal: 280000000, budgetReach: 6250, actualReach: 5250 },
-      ODP: { budgetActivity: 80, actualActivity: 72, budgetNominal: 90000000, actualNominal: 81000000, budgetReach: 2000, actualReach: 1800 },
-      SFT: { budgetActivity: 150, actualActivity: 130, budgetNominal: 180000000, actualNominal: 162000000, budgetReach: 3750, actualReach: 3250 },
-      BFFD: { budgetActivity: 60, actualActivity: 45, budgetNominal: 90000000, actualNominal: 70000000, budgetReach: 1500, actualReach: 1125 },
-      BFM: { budgetActivity: 110, actualActivity: 90, budgetNominal: 160000000, actualNominal: 130000000, budgetReach: 2750, actualReach: 2250 },
-      BFT: { budgetActivity: 45, actualActivity: 38, budgetNominal: 75000000, actualNominal: 65000000, budgetReach: 1125, actualReach: 950 },
-      BC: { budgetActivity: 200, actualActivity: 175, budgetNominal: 120000000, actualNominal: 105000000, budgetReach: 5000, actualReach: 4375 },
-      CRV: { budgetActivity: 70, actualActivity: 58, budgetNominal: 110000000, actualNominal: 95000000, budgetReach: 1750, actualReach: 1450 },
-      EXP: { budgetActivity: 30, actualActivity: 24, budgetNominal: 140000000, actualNominal: 115000000, budgetReach: 750, actualReach: 600 },
-      PT: { budgetActivity: 95, actualActivity: 82, budgetNominal: 55000000, actualNominal: 48000000, budgetReach: 2375, actualReach: 2050 },
-    };
-
-    pogDataOverviewFiltered.forEach((item) => {
-      const kioskCharSum = (item.kiosk || "").split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
-      const seedVal = kioskCharSum % 100;
-      const actIdx = kioskCharSum % ORIGINAL_ACTIVITIES_LIST.length;
-      const actName = ORIGINAL_ACTIVITIES_LIST[actIdx];
-
-      const rowBudAct = 1 + (seedVal % 4);
-      const rowActAct = Math.round(rowBudAct * (0.8 + (seedVal % 20) / 100));
-
-      const rowBudNom = (2000000 + (seedVal * 150000) % 15000000);
-      const rowActNom = Math.round(rowBudNom * (0.82 + (seedVal % 18) / 100));
-
-      const rowBudReach = rowBudAct * (20 + (seedVal % 15));
-      const rowActReach = Math.round(rowBudReach * (0.8 + (seedVal % 20) / 100));
-
-      if ((totals as any)[actName]) {
-        (totals as any)[actName].budgetActivity += rowBudAct;
-        (totals as any)[actName].actualActivity += rowActAct;
-        (totals as any)[actName].budgetNominal += rowBudNom;
-        (totals as any)[actName].actualNominal += rowActNom;
-        (totals as any)[actName].budgetReach += rowBudReach;
-        (totals as any)[actName].actualReach += rowActReach;
-      }
-    });
-
-    const activeTotals = Object.keys(totals)
-      .filter((k) => ACTIVITIES_LIST.includes(k))
-      .map((k) => (totals as any)[k]);
-
-    const totalBudgetAct = activeTotals.reduce((sum, t) => sum + t.budgetActivity, 0);
-    const totalActualAct = activeTotals.reduce((sum, t) => sum + t.actualActivity, 0);
-    const totalBudgetNom = activeTotals.reduce((sum, t) => sum + t.budgetNominal, 0);
-    const totalActualNom = activeTotals.reduce((sum, t) => sum + t.actualNominal, 0);
-    const totalBudgetReach = activeTotals.reduce((sum, t) => sum + t.budgetReach, 0);
-    const totalActualReach = activeTotals.reduce((sum, t) => sum + t.actualReach, 0);
-
-    return {
-      activity: { budget: totalBudgetAct, actual: totalActualAct },
-      nominal: { budget: totalBudgetNom, actual: totalActualNom },
-      reach: { budget: totalBudgetReach, actual: totalActualReach },
-    };
-  }, [pogDataOverviewFiltered, filterBelowType]);
-
-  const overviewStats = useMemo(() => {
+const overviewStats = useMemo(() => {
     let activeKiosks = kiosks || [];
     if (filterBelowChannel && filterBelowChannel !== "All") {
       activeKiosks = activeKiosks.filter(
@@ -5747,284 +5691,175 @@ const Dashboard = ({
     let totalCurrentStock = 0;
     let totalIdleStock = 0;
 
-    pogDataOverviewFiltered.forEach((item) => {
-      totalOpeningStock += Number(item.lastQty || 0);
-      totalSellIn += Number(item.sellIn || 0);
-      totalSellOut += Number(item.sellOut || 0);
-      totalCurrentStock += Number(item.currentQty || 0);
-      totalIdleStock += Number(item.idleStock || 0);
-    });
+    let filteredData = overviewApiData || [];
+    
+    // Apply filters to overviewApiData
+    if (filterBelowMonth && filterBelowMonth.length > 0) {
+      filteredData = filteredData.filter(d => {
+        if (!d.month) return false;
+        const parsed = parseWorkingMonth(d.month);
+        if (parsed) {
+          const formatted = `${INDO_MONTHS[parsed.monthIndex]} ${parsed.year}`;
+          return filterBelowMonth.includes(formatted);
+        }
+        return filterBelowMonth.includes(d.month);
+      });
+    }
+    if (activeActivityFilter && activeActivityFilter !== "All") {
+      filteredData = filteredData.filter(d => cleanForMatch(d.activity) === cleanForMatch(activeActivityFilter));
+    }
+    if (filterBelowTeam && filterBelowTeam !== "All") {
+      filteredData = filteredData.filter(d => cleanForMatch(d.sa) === cleanForMatch(filterBelowTeam) || cleanForMatch(d.bs) === cleanForMatch(filterBelowTeam));
+    }
+    if (filterBelowArea && filterBelowArea !== "All") {
+      filteredData = filteredData.filter(d => {
+        return cleanForMatch(d.territory || "") === cleanForMatch(filterBelowArea);
+      });
+    }
+    if (filterBelowCrop && filterBelowCrop !== "All") {
+      filteredData = filteredData.filter(d => {
+        const budKey = `bud ADV ${filterBelowCrop}`;
+        const actKey = `act ADV ${filterBelowCrop}`;
+        return safeNum(d[budKey]) > 0 || safeNum(d[actKey]) > 0;
+      });
+    }
+    if (filterBelowChannel && filterBelowChannel !== "All") {
+      const activePics = new Set(
+        kiosks
+          .filter(k => cleanForMatch(k.category) === cleanForMatch(filterBelowChannel))
+          .map(k => cleanForMatch(k.pic))
+          .filter(Boolean)
+      );
+      filteredData = filteredData.filter((d) => {
+        return activePics.has(cleanForMatch(d.sa)) || activePics.has(cleanForMatch(d.bs));
+      });
+    }
+    if (filterBelowMaterial && filterBelowMaterial !== "All") {
+      filteredData = filteredData.filter((d) => {
+        const mClean = filterBelowMaterial.toLowerCase().replace(/[^a-z0-9]/g, '');
+        let hasValue = false;
+        Object.keys(d).forEach(k => {
+          const cleanK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (cleanK.includes(mClean) && (cleanK.startsWith("bud") || cleanK.startsWith("act"))) {
+            if (safeNum(d[k]) > 0) hasValue = true;
+          }
+        });
+        return hasValue;
+      });
+    }
+    if (filterBelowType && filterBelowType !== "All") {
+      filteredData = filteredData.filter((d) => {
+        const actClean = (d.activity || "").toLowerCase();
+        const isRegular = actClean.includes("farmer field day") || 
+                          actClean.includes("farmers meeting") || 
+                          actClean.includes("farmer meeting") || 
+                          actClean.includes("open demo plot") || 
+                          actClean.includes("small field trial") || 
+                          actClean.includes("product trial") ||
+                          actClean === "ffd" ||
+                          actClean === "fm" ||
+                          actClean === "odp" ||
+                          actClean === "sft" ||
+                          actClean === "pt";
+        return filterBelowType === "Regular" ? isRegular : !isRegular;
+      });
+    }
 
-    const AREAS_LIST = ["T1", "T2", "T3", "T4", "T5", "T6", "T7"];
-    const PROVINCES_LIST = [
-      "North Sumatra", "West Sumatra", "Lampung",
-      "Central Java", "East Java", "Gorontalo",
-      "North Sulawesi", "South Sulawesi", "NTB"
-    ];
-    const SALES_AGRONOMISTS_LIST = [
-      "Rian Hidayat", "Agus Hermawan", "Dedi Setiawan", "Budi Santoso",
-      "Hendra Kurniawan", "Eko Prasetyo", "Andi Wijaya", "Slamet Riyadi",
-      "Yanto Subagyo", "Feri Nugroho", "Joko Susilo", "Rudi Hartono",
-      "Mulyono", "Setiawan", "Herianto", "Bambang", "Edi Purwanto", "Wawan"
-    ];
-    const HYBRIDS_LIST = ["JAGO", "RUBY", "JALU", "GANESH"];
-    const ACTIVITIES_LIST = ["FFD", "FM", "ODP", "SFT", "BFFD", "BFM", "BFT", "BC", "CRV", "EXP", "PT"];
-
-    const getDeterministicDummy = (name: string, index: number) => {
-      // Create high-quality, realistic dummy metrics based on the name hash
-      const charSum = name.split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
-      const seedVal = (charSum + index * 47) % 100;
-      const multiplier = 0.7 + (seedVal / 100) * 0.8; // between 0.7 and 1.5
-
-      const opening = Math.floor((1500 + (seedVal * 17) % 1000) * multiplier);
-      const sellIn = Math.floor((1200 + (seedVal * 31) % 800) * multiplier);
-      const pog = Math.floor((1100 + (seedVal * 23) % 900) * multiplier);
-      const sellOut = Math.floor(pog * 1.08);
-      const stock = Math.max(150, opening + sellIn - sellOut);
-      const idle = Math.floor(stock * 0.14);
-
-      // Activity metrics: budget vs actual (e.g. 10 to 80 events)
-      const budgetActivity = Math.floor((15 + (seedVal * 7) % 65) * multiplier);
-      const actualActivity = Math.floor(budgetActivity * (0.8 + (seedVal % 20) / 100));
-
-      // Nominal metrics: budget vs actual (e.g. Rp 50.000.000 to Rp 350.000.000)
-      const budgetNominal = Math.floor((50000000 + (seedVal * 3500000) % 300000000) * multiplier);
-      const actualNominal = Math.floor(budgetNominal * (0.82 + (seedVal % 18) / 100));
-
-      // Reach metrics: number of attending farmers (e.g. 300 to 2400 farmers)
-      const budgetReach = Math.floor(budgetActivity * (20 + (seedVal % 15)));
-      const actualReach = Math.floor(actualActivity * (18 + ((seedVal + 3) % 15)));
-
-      return {
-        name,
-        pog,
-        stock,
-        sellIn,
-        sellOut,
-        opening,
-        idle,
-        budgetActivity,
-        actualActivity,
-        budgetNominal,
-        actualNominal,
-        budgetReach,
-        actualReach,
-      };
-    };
-
-    // Generic helper to build grouped chart data by dimension
     const buildChartData = (dimension: string, filterByMainKey?: string | null) => {
-      const gMap: Record<
-        string,
-        {
-          name: string;
-          pog: number;
-          stock: number;
-          sellIn: number;
-          sellOut: number;
-          opening: number;
-          idle: number;
-          budgetActivity: number;
-          actualActivity: number;
-          budgetNominal: number;
-          actualNominal: number;
-          budgetReach: number;
-          actualReach: number;
-        }
-      > = {};
+      const gMap: Record<string, any> = {};
 
-      const activityScale = activeActivityFilter ? 0.25 : 1.0;
-      const scaleFactor = (filterByMainKey ? 0.15 : 1.0) * activityScale;
-
-      if (dimension === "area") {
-        AREAS_LIST.forEach((area, idx) => {
-          const dummy = getDeterministicDummy(area, idx);
-          if (filterByMainKey || activeActivityFilter) {
-            dummy.pog = Math.round(dummy.pog * scaleFactor);
-            dummy.stock = Math.round(dummy.stock * scaleFactor);
-            dummy.sellIn = Math.round(dummy.sellIn * scaleFactor);
-            dummy.sellOut = Math.round(dummy.sellOut * scaleFactor);
-            dummy.opening = Math.round(dummy.opening * scaleFactor);
-            dummy.idle = Math.round(dummy.idle * scaleFactor);
-            dummy.budgetActivity = Math.round(dummy.budgetActivity * scaleFactor);
-            dummy.actualActivity = Math.round(dummy.actualActivity * scaleFactor);
-            dummy.budgetNominal = Math.round(dummy.budgetNominal * scaleFactor);
-            dummy.actualNominal = Math.round(dummy.actualNominal * scaleFactor);
-            dummy.budgetReach = Math.round(dummy.budgetReach * scaleFactor);
-            dummy.actualReach = Math.round(dummy.actualReach * scaleFactor);
-          }
-          gMap[area] = dummy;
-        });
-      } else if (dimension === "province") {
-        PROVINCES_LIST.forEach((prov, idx) => {
-          const dummy = getDeterministicDummy(prov, idx);
-          if (filterByMainKey || activeActivityFilter) {
-            dummy.pog = Math.round(dummy.pog * scaleFactor);
-            dummy.stock = Math.round(dummy.stock * scaleFactor);
-            dummy.sellIn = Math.round(dummy.sellIn * scaleFactor);
-            dummy.sellOut = Math.round(dummy.sellOut * scaleFactor);
-            dummy.opening = Math.round(dummy.opening * scaleFactor);
-            dummy.idle = Math.round(dummy.idle * scaleFactor);
-            dummy.budgetActivity = Math.round(dummy.budgetActivity * scaleFactor);
-            dummy.actualActivity = Math.round(dummy.actualActivity * scaleFactor);
-            dummy.budgetNominal = Math.round(dummy.budgetNominal * scaleFactor);
-            dummy.actualNominal = Math.round(dummy.actualNominal * scaleFactor);
-            dummy.budgetReach = Math.round(dummy.budgetReach * scaleFactor);
-            dummy.actualReach = Math.round(dummy.actualReach * scaleFactor);
-          }
-          gMap[prov] = dummy;
-        });
-      } else if (dimension === "sales_agronomist") {
-        SALES_AGRONOMISTS_LIST.forEach((sa, idx) => {
-          const dummy = getDeterministicDummy(sa, idx);
-          if (filterByMainKey || activeActivityFilter) {
-            dummy.pog = Math.round(dummy.pog * scaleFactor);
-            dummy.stock = Math.round(dummy.stock * scaleFactor);
-            dummy.sellIn = Math.round(dummy.sellIn * scaleFactor);
-            dummy.sellOut = Math.round(dummy.sellOut * scaleFactor);
-            dummy.opening = Math.round(dummy.opening * scaleFactor);
-            dummy.idle = Math.round(dummy.idle * scaleFactor);
-            dummy.budgetActivity = Math.round(dummy.budgetActivity * scaleFactor);
-            dummy.actualActivity = Math.round(dummy.actualActivity * scaleFactor);
-            dummy.budgetNominal = Math.round(dummy.budgetNominal * scaleFactor);
-            dummy.actualNominal = Math.round(dummy.actualNominal * scaleFactor);
-            dummy.budgetReach = Math.round(dummy.budgetReach * scaleFactor);
-            dummy.actualReach = Math.round(dummy.actualReach * scaleFactor);
-          }
-          gMap[sa] = dummy;
-        });
-      } else if (dimension === "hybrid" || dimension === "material") {
-        HYBRIDS_LIST.forEach((hyb, idx) => {
-          const dummy = getDeterministicDummy(hyb, idx);
-          if (filterByMainKey || activeActivityFilter) {
-            dummy.pog = Math.round(dummy.pog * scaleFactor);
-            dummy.stock = Math.round(dummy.stock * scaleFactor);
-            dummy.sellIn = Math.round(dummy.sellIn * scaleFactor);
-            dummy.sellOut = Math.round(dummy.sellOut * scaleFactor);
-            dummy.opening = Math.round(dummy.opening * scaleFactor);
-            dummy.idle = Math.round(dummy.idle * scaleFactor);
-            dummy.budgetActivity = Math.round(dummy.budgetActivity * scaleFactor);
-            dummy.actualActivity = Math.round(dummy.actualActivity * scaleFactor);
-            dummy.budgetNominal = Math.round(dummy.budgetNominal * scaleFactor);
-            dummy.actualNominal = Math.round(dummy.actualNominal * scaleFactor);
-            dummy.budgetReach = Math.round(dummy.budgetReach * scaleFactor);
-            dummy.actualReach = Math.round(dummy.actualReach * scaleFactor);
-          }
-          gMap[hyb] = dummy;
-        });
-      } else if (dimension === "activity") {
-        ACTIVITIES_LIST.forEach((act, idx) => {
-          const dummy = getDeterministicDummy(act, idx);
-          if (filterByMainKey || activeActivityFilter) {
-            dummy.pog = Math.round(dummy.pog * scaleFactor);
-            dummy.stock = Math.round(dummy.stock * scaleFactor);
-            dummy.sellIn = Math.round(dummy.sellIn * scaleFactor);
-            dummy.sellOut = Math.round(dummy.sellOut * scaleFactor);
-            dummy.opening = Math.round(dummy.opening * scaleFactor);
-            dummy.idle = Math.round(dummy.idle * scaleFactor);
-            dummy.budgetActivity = Math.round(dummy.budgetActivity * scaleFactor);
-            dummy.actualActivity = Math.round(dummy.actualActivity * scaleFactor);
-            dummy.budgetNominal = Math.round(dummy.budgetNominal * scaleFactor);
-            dummy.actualNominal = Math.round(dummy.actualNominal * scaleFactor);
-            dummy.budgetReach = Math.round(dummy.budgetReach * scaleFactor);
-            dummy.actualReach = Math.round(dummy.actualReach * scaleFactor);
-          }
-          gMap[act] = dummy;
-        });
-      }
-
-      pogDataOverviewFiltered.forEach((item) => {
-        // If activeActivityFilter is active, filter items by it!
-        const kioskCharSumForAct = (item.kiosk || "").split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
-        const actIdxForAct = kioskCharSumForAct % ACTIVITIES_LIST.length;
-        const itemAct = ACTIVITIES_LIST[actIdxForAct];
-
-        if (activeActivityFilter && itemAct !== activeActivityFilter) {
-          return;
-        }
-
-        // If filterByMainKey is active, verify if item belongs to that main key
+      filteredData.forEach(item => {
         if (filterByMainKey) {
-          const itemPic = item.pic;
-          const rawPos = getFromRecord<string>(teamPositions, itemPic) || "";
-          const pos = normalizePosition(rawPos);
-          let belongs = false;
-
-          if (overviewGroupDimension === "area") {
-            const itemArea = item.area || "";
-            belongs = cleanForMatch(itemArea) === cleanForMatch(filterByMainKey);
-          } else if (overviewGroupDimension === "province") {
-            const itemProv = getFromRecord<string>(teamProvinces, itemPic) || item.province || "";
-            belongs = cleanForMatch(itemProv) === cleanForMatch(filterByMainKey);
-          } else if (overviewGroupDimension === "sales_agronomist") {
-            if (pos === "Sales Agronomist" && itemPic) {
-              belongs = cleanForMatch(itemPic) === cleanForMatch(filterByMainKey);
-            }
-          } else if (overviewGroupDimension === "hybrid" || overviewGroupDimension === "material") {
-            const itemHyb = item.hybrid || "";
-            belongs = cleanForMatch(itemHyb) === cleanForMatch(filterByMainKey);
-          } else if (overviewGroupDimension === "activity") {
-            const kioskCharSum = (item.kiosk || "").split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
-            const actIdx = kioskCharSum % ACTIVITIES_LIST.length;
-            const act = ACTIVITIES_LIST[actIdx];
-            belongs = cleanForMatch(act) === cleanForMatch(filterByMainKey);
-          }
-
-          if (!belongs) return;
+           let belongs = false;
+           if (overviewGroupDimension === "area") {
+             const area = item.territory || "-";
+belongs = cleanForMatch(area) === cleanForMatch(filterByMainKey);
+           } else if (overviewGroupDimension === "province") {
+             const prov = getFromRecord<string>(teamProvinces, item.sa) || "-";
+             belongs = cleanForMatch(prov) === cleanForMatch(filterByMainKey);
+           } else if (overviewGroupDimension === "sales_agronomist") {
+             belongs = cleanForMatch(item.sa) === cleanForMatch(filterByMainKey);
+           } else if (overviewGroupDimension === "hybrid" || overviewGroupDimension === "material") {
+             // Skip check for crops
+           } else if (overviewGroupDimension === "activity") {
+             belongs = cleanForMatch(item.activity) === cleanForMatch(filterByMainKey);
+           }
+           if (!belongs && overviewGroupDimension !== "hybrid" && overviewGroupDimension !== "material") return;
         }
 
-        let gVal = "";
-        const itemPic = item.pic;
-        const rawPos = getFromRecord<string>(teamPositions, itemPic) || "";
-        const pos = normalizePosition(rawPos);
+        const addMetrics = (key: string, dataItem: any, isCrop?: boolean) => {
+           if (!key) return;
+           if (!gMap[key]) {
+             gMap[key] = {
+               name: key,
+               budgetActivity: 0, actualActivity: 0,
+               budgetNominal: 0, actualNominal: 0,
+               budgetReach: 0, actualReach: 0,
+               budgetDirectSales: 0, directSales: 0,
+               pog: 0, stock: 0, sellIn: 0, sellOut: 0, opening: 0, idle: 0
+             };
+           }
+           
+           if (!isCrop) {
+             gMap[key].budgetActivity += safeNum(dataItem.budgetActivity);
+             gMap[key].actualActivity += safeNum(dataItem.actualActivity);
+             gMap[key].budgetNominal += safeNum(dataItem.amountBudget);
+             gMap[key].actualNominal += safeNum(dataItem.actualAmount);
+             gMap[key].budgetReach += safeNum(dataItem.budgetFarmerReach);
+             gMap[key].actualReach += safeNum(dataItem.farmerReach);
+             gMap[key].budgetDirectSales += safeNum(dataItem.budgetDirectSales);
+             gMap[key].directSales += safeNum(dataItem.directSales);
+             gMap[key].sellOut += safeNum(dataItem.directSales);
+             gMap[key].pog += safeNum(dataItem.directSales);
+           } else {
+             gMap[key].budgetActivity += safeNum(dataItem.budgetActivity);
+             gMap[key].actualActivity += safeNum(dataItem.actualActivity);
+             gMap[key].pog += safeNum(dataItem.cropVal);
+             gMap[key].stock += safeNum(dataItem.cropVal);
+             gMap[key].sellOut += safeNum(dataItem.cropVal);
+             gMap[key].directSales += safeNum(dataItem.cropVal);
+           }
+        };
 
         if (dimension === "area") {
-          const itemArea = item.area || "";
-          const matched = AREAS_LIST.find(a => cleanForMatch(a) === cleanForMatch(itemArea));
-          if (matched) gVal = matched;
-        } else if (dimension === "province") {
-          const itemProv = getFromRecord<string>(teamProvinces, itemPic) || item.province || "";
-          const matched = PROVINCES_LIST.find(p => cleanForMatch(p) === cleanForMatch(itemProv));
-          if (matched) gVal = matched;
+const area = item.territory || "Unknown Area";
+addMetrics(area, item);
+} else if (dimension === "province") {
+           const prov = getFromRecord<string>(teamProvinces, item.sa) || "Unknown Province";
+           addMetrics(prov, item);
         } else if (dimension === "sales_agronomist") {
-          if (pos === "Sales Agronomist" && itemPic) {
-            const matched = SALES_AGRONOMISTS_LIST.find(sa => cleanForMatch(sa) === cleanForMatch(itemPic));
-            if (matched) gVal = matched;
-          }
-        } else if (dimension === "hybrid" || dimension === "material") {
-          const itemHyb = item.hybrid || "";
-          const matched = HYBRIDS_LIST.find(h => cleanForMatch(h) === cleanForMatch(itemHyb));
-          if (matched) gVal = matched;
+           addMetrics(item.sa || "Unknown SA", item);
         } else if (dimension === "activity") {
-          const kioskCharSum = (item.kiosk || "").split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
-          const actIdx = kioskCharSum % ACTIVITIES_LIST.length;
-          gVal = ACTIVITIES_LIST[actIdx];
-        }
+           addMetrics(item.activity || "Unknown Activity", item);
+        } else if (dimension === "hybrid" || dimension === "material") {
+           const hybridList = ["ADV MONTOK", "ADV JOSS", "ADV BEJO", "ADV GANESH", "ADV JAGO", "ADV JALU", "ADV RUBY"];
+           hybridList.forEach(cropName => {
+              if (filterByMainKey && cleanForMatch(cropName) !== cleanForMatch(filterByMainKey)) return;
+              
+              let budProp = "";
+              let actProp = "";
+              Object.keys(item).forEach(k => {
+                 const cleanK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+                 const cleanCrop = cropName.toLowerCase().replace(/[^a-z0-9]/g, '');
+                 if (cleanK === `bud${cleanCrop}`) budProp = k;
+                 if (cleanK === `act${cleanCrop}`) actProp = k;
+              });
 
-        if (gVal) {
-          if (!gMap[gVal]) {
-            gMap[gVal] = {
-              name: gVal,
-              pog: 0,
-              stock: 0,
-              sellIn: 0,
-              sellOut: 0,
-              opening: 0,
-              idle: 0,
-              budgetActivity: 0,
-              actualActivity: 0,
-              budgetNominal: 0,
-              actualNominal: 0,
-              budgetReach: 0,
-              actualReach: 0,
-            };
-          }
-          gMap[gVal].pog += Number(item.pog || 0);
-          gMap[gVal].stock += Number(item.currentQty || 0);
-          gMap[gVal].sellIn += Number(item.sellIn || 0);
-          gMap[gVal].sellOut += Number(item.sellOut || 0);
-          gMap[gVal].opening += Number(item.lastQty || 0);
-          gMap[gVal].idle += Number(item.idleStock || 0);
+              let budVal = budProp ? Number(item[budProp] || 0) : 0;
+              let actVal = actProp ? Number(item[actProp] || 0) : 0;
+              let cropVal = 0;
+              if (item.crops && item.crops[cropName]) {
+                  cropVal = item.crops[cropName];
+              }
+              
+              if (budVal > 0 || actVal > 0 || cropVal > 0 || filterByMainKey) {
+                  addMetrics(cropName, { 
+                      budgetActivity: budVal,
+                      actualActivity: actVal,
+                      cropVal: cropVal
+                  }, true);
+              }
+           });
         }
       });
 
@@ -6058,20 +5893,16 @@ const Dashboard = ({
           actual = item.pog || 0;
           budget = 0;
         }
-
         const percentage = budget > 0 ? (actual / budget) * 100 : 0;
         const gap = actual - budget;
-
         return { actual, budget, percentage, gap };
       };
 
       return Object.values(gMap).sort((a, b) => {
         const metricsA = getMetricsForSort(a);
         const metricsB = getMetricsForSort(b);
-
         let valA = metricsA[overviewSortField];
         let valB = metricsB[overviewSortField];
-
         if (overviewSortOrder === "asc") {
           return valA - valB;
         } else {
@@ -6082,165 +5913,15 @@ const Dashboard = ({
 
     const areaChartData = buildChartData(overviewGroupDimension);
     const subChartData = buildChartData(subGroupDimension, activeMainBarKey);
+    const categoryChartData = buildChartData("activity");
+    const partnerChartData = buildChartData("sales_agronomist");
+    const hybridPieData = buildChartData("hybrid");
+    const territoryPieData = buildChartData("area");
+    const cropsChartData = buildChartData("hybrid");
 
-    // Group by Category of Kiosk (Channel)
-    const catMap: Record<string, { name: string; value: number }> = {};
-    activeKiosks.forEach((k) => {
-      const cat = k.category || "Uncategorized";
-      if (!catMap[cat]) {
-        catMap[cat] = { name: cat, value: 0 };
-      }
-      catMap[cat].value += 1;
+    filteredData.forEach(item => {
+       totalSellOut += safeNum(item.directSales);
     });
-    const categoryChartData = Object.values(catMap);
-
-    // Group by selected partnerSegmentDimension
-    const partnerMap: Record<string, { name: string; actual: number; budget: number }> = {};
-    const SEG_AREAS_LIST = ["T1", "T2", "T3", "T4", "T5", "T6", "T7"];
-    const SEG_PROVINCES_LIST = [
-      "North Sumatra", "West Sumatra", "Lampung",
-      "Central Java", "East Java", "Gorontalo",
-      "North Sulawesi", "South Sulawesi", "NTB"
-    ];
-    const SEG_SALES_AGRONOMISTS_LIST = [
-      "Rian Hidayat", "Agus Hermawan", "Dedi Setiawan", "Budi Santoso",
-      "Hendra Kurniawan", "Eko Prasetyo", "Andi Wijaya", "Slamet Riyadi",
-      "Yanto Subagyo", "Feri Nugroho", "Joko Susilo", "Rudi Hartono",
-      "Mulyono", "Setiawan", "Herianto", "Bambang", "Edi Purwanto", "Wawan"
-    ];
-    const SEG_HYBRIDS_LIST = ["JAGO", "RUBY", "JALU", "GANESH"];
-    const SEG_ACTIVITIES_LIST = ["FFD", "FM", "ODP", "SFT", "BFFD", "BFM", "BFT", "BC", "CRV", "EXP", "PT"];
-
-    activeKiosks.forEach((k) => {
-      let groupName = "Uncategorized";
-      const charSum = k.name.split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
-
-      if (partnerSegmentDimension === "area") {
-        groupName = k.area || "Lainnya";
-        const matched = SEG_AREAS_LIST.find(a => cleanForMatch(a) === cleanForMatch(groupName));
-        if (matched) groupName = matched;
-      } else if (partnerSegmentDimension === "province") {
-        groupName = k.province || "Lainnya";
-        const matched = SEG_PROVINCES_LIST.find(p => cleanForMatch(p) === cleanForMatch(groupName));
-        if (matched) groupName = matched;
-      } else if (partnerSegmentDimension === "sales_agronomist") {
-        groupName = k.pic || "Lainnya";
-        const matched = SEG_SALES_AGRONOMISTS_LIST.find(sa => cleanForMatch(sa) === cleanForMatch(groupName));
-        if (matched) groupName = matched;
-      } else if (partnerSegmentDimension === "hybrid") {
-        const hybIdx = charSum % SEG_HYBRIDS_LIST.length;
-        groupName = SEG_HYBRIDS_LIST[hybIdx];
-      } else if (partnerSegmentDimension === "activity") {
-        const actIdx = charSum % SEG_ACTIVITIES_LIST.length;
-        groupName = SEG_ACTIVITIES_LIST[actIdx];
-      }
-
-      if (!partnerMap[groupName]) {
-        partnerMap[groupName] = { name: groupName, actual: 0, budget: 0 };
-      }
-      partnerMap[groupName].actual += 1;
-    });
-
-    // Populate budget deterministically based on actual
-    Object.keys(partnerMap).forEach((key) => {
-      const act = partnerMap[key].actual;
-      partnerMap[key].budget = Math.round(act * 1.2) + 2;
-    });
-
-    let partnerChartData: Array<{ name: string; actual: number; budget: number }> = Object.values(partnerMap);
-    if (partnerChartData.length === 0) {
-      if (partnerSegmentDimension === "area") {
-        partnerChartData = [
-          { name: "T1", actual: 48, budget: 55 },
-          { name: "T2", actual: 39, budget: 45 },
-          { name: "T3", actual: 30, budget: 35 },
-          { name: "T4", actual: 22, budget: 25 },
-          { name: "T5", actual: 18, budget: 22 },
-          { name: "T6", actual: 15, budget: 18 },
-          { name: "T7", actual: 12, budget: 15 }
-        ];
-      } else if (partnerSegmentDimension === "province") {
-        partnerChartData = [
-          { name: "North Sumatra", actual: 42, budget: 48 },
-          { name: "Central Java", actual: 31, budget: 35 },
-          { name: "East Java", actual: 25, budget: 30 },
-          { name: "South Sulawesi", actual: 19, budget: 25 },
-          { name: "NTB", actual: 14, budget: 18 },
-          { name: "Lampung", actual: 8, budget: 10 }
-        ];
-      } else if (partnerSegmentDimension === "sales_agronomist") {
-        partnerChartData = [
-          { name: "Rian Hidayat", actual: 35, budget: 40 },
-          { name: "Agus Hermawan", actual: 28, budget: 32 },
-          { name: "Dedi Setiawan", actual: 24, budget: 28 },
-          { name: "Budi Santoso", actual: 20, budget: 24 },
-          { name: "Hendra Kurniawan", actual: 15, budget: 18 }
-        ];
-      } else if (partnerSegmentDimension === "hybrid") {
-        partnerChartData = [
-          { name: "JAGO", actual: 55, budget: 60 },
-          { name: "RUBY", actual: 42, budget: 48 },
-          { name: "JALU", actual: 38, budget: 42 },
-          { name: "GANESH", actual: 29, budget: 35 }
-        ];
-      } else if (partnerSegmentDimension === "activity") {
-        partnerChartData = [
-          { name: "FFD", actual: 64, budget: 70 },
-          { name: "FM", actual: 48, budget: 55 },
-          { name: "ODP", actual: 36, budget: 40 },
-          { name: "SFT", actual: 22, budget: 25 },
-          { name: "BFFD", actual: 18, budget: 20 },
-          { name: "BFM", actual: 32, budget: 35 },
-          { name: "BFT", actual: 12, budget: 15 },
-          { name: "BC", actual: 50, budget: 60 },
-          { name: "CRV", actual: 28, budget: 30 },
-          { name: "EXP", actual: 10, budget: 12 },
-          { name: "PT", actual: 45, budget: 50 }
-        ];
-      }
-    }
-
-    // Sort partnerChartData by sort filters
-    partnerChartData.sort((a, b) => {
-      const actA = a.actual || 0;
-      const budA = a.budget || 0;
-      const pctA = budA > 0 ? (actA / budA) * 100 : 0;
-      const gapA = actA - budA;
-
-      const actB = b.actual || 0;
-      const budB = b.budget || 0;
-      const pctB = budB > 0 ? (actB / budB) * 100 : 0;
-      const gapB = actB - budB;
-
-      const metricsA = { actual: actA, budget: budA, percentage: pctA, gap: gapA };
-      const metricsB = { actual: actB, budget: budB, percentage: pctB, gap: gapB };
-
-      let valA = metricsA[overviewSortField];
-      let valB = metricsB[overviewSortField];
-
-      if (overviewSortOrder === "asc") {
-        return valA - valB;
-      } else {
-        return valB - valA;
-      }
-    });
-
-    // Group by Crops
-    const cropMap: Record<
-      string,
-      { name: string; stock: number; pog: number }
-    > = {};
-    pogDataOverviewFiltered.forEach((item) => {
-      const crop = item.crops || "Lainnya";
-      if (!cropMap[crop]) {
-        cropMap[crop] = { name: crop, stock: 0, pog: 0 };
-      }
-      cropMap[crop].stock += Number(item.currentQty || 0);
-      cropMap[crop].pog += Number(item.pog || 0);
-    });
-    const cropsChartData = Object.values(cropMap).sort(
-      (a, b) => b.stock - a.stock,
-    );
 
     return {
       totalKiosks,
@@ -6254,11 +5935,12 @@ const Dashboard = ({
       categoryChartData,
       cropsChartData,
       partnerChartData,
-      hybridPieData: buildChartData("hybrid"),
-      territoryPieData: buildChartData("area"),
+      hybridPieData,
+      territoryPieData,
     };
   }, [
     kiosks,
+    overviewApiData,
     pogDataOverviewFiltered,
     overviewMetricFilter,
     overviewSubFilter,
@@ -6268,9 +5950,12 @@ const Dashboard = ({
     teamPositions,
     teamProvinces,
     filterBelowChannel,
+    filterBelowMonth,
     filterBelowTeam,
     filterBelowArea,
     filterBelowCrop,
+    filterBelowMaterial,
+    filterBelowType,
     userData,
     teamMembers,
     teamAreas,
@@ -6295,6 +5980,78 @@ const Dashboard = ({
 
     let rawList: any[] = [];
 
+    let filteredData = overviewApiData || [];
+    if (filterBelowMonth && filterBelowMonth.length > 0) {
+      filteredData = filteredData.filter(d => {
+        if (!d.month) return false;
+        const parsed = parseWorkingMonth(d.month);
+        if (parsed) {
+          const formatted = `${INDO_MONTHS[parsed.monthIndex]} ${parsed.year}`;
+          return filterBelowMonth.includes(formatted);
+        }
+        return filterBelowMonth.includes(d.month);
+      });
+    }
+    if (activeActivityFilter && activeActivityFilter !== "All") {
+      filteredData = filteredData.filter(d => cleanForMatch(d.activity) === cleanForMatch(activeActivityFilter));
+    }
+    if (filterBelowTeam && filterBelowTeam !== "All") {
+      filteredData = filteredData.filter(d => cleanForMatch(d.sa) === cleanForMatch(filterBelowTeam) || cleanForMatch(d.bs) === cleanForMatch(filterBelowTeam));
+    }
+    if (filterBelowArea && filterBelowArea !== "All") {
+      filteredData = filteredData.filter(d => {
+        return cleanForMatch(d.territory || "") === cleanForMatch(filterBelowArea);
+      });
+    }
+    if (filterBelowCrop && filterBelowCrop !== "All") {
+      filteredData = filteredData.filter(d => {
+        const budKey = `bud ADV ${filterBelowCrop}`;
+        const actKey = `act ADV ${filterBelowCrop}`;
+        return safeNum(d[budKey]) > 0 || safeNum(d[actKey]) > 0;
+      });
+    }
+    if (filterBelowChannel && filterBelowChannel !== "All") {
+      const activePics = new Set(
+        kiosks
+          .filter(k => cleanForMatch(k.category) === cleanForMatch(filterBelowChannel))
+          .map(k => cleanForMatch(k.pic))
+          .filter(Boolean)
+      );
+      filteredData = filteredData.filter((d) => {
+        return activePics.has(cleanForMatch(d.sa)) || activePics.has(cleanForMatch(d.bs));
+      });
+    }
+    if (filterBelowMaterial && filterBelowMaterial !== "All") {
+      filteredData = filteredData.filter((d) => {
+        const mClean = filterBelowMaterial.toLowerCase().replace(/[^a-z0-9]/g, '');
+        let hasValue = false;
+        Object.keys(d).forEach(k => {
+          const cleanK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (cleanK.includes(mClean) && (cleanK.startsWith("bud") || cleanK.startsWith("act"))) {
+            if (safeNum(d[k]) > 0) hasValue = true;
+          }
+        });
+        return hasValue;
+      });
+    }
+    if (filterBelowType && filterBelowType !== "All") {
+      filteredData = filteredData.filter((d) => {
+        const actClean = (d.activity || "").toLowerCase();
+        const isRegular = actClean.includes("farmer field day") || 
+                          actClean.includes("farmers meeting") || 
+                          actClean.includes("farmer meeting") || 
+                          actClean.includes("open demo plot") || 
+                          actClean.includes("small field trial") || 
+                          actClean.includes("product trial") ||
+                          actClean === "ffd" ||
+                          actClean === "fm" ||
+                          actClean === "odp" ||
+                          actClean === "sft" ||
+                          actClean === "pt";
+        return filterBelowType === "Regular" ? isRegular : !isRegular;
+      });
+    }
+
     if (bubbleDimension === "activity") {
       const activities = [
         { code: "FFD", fullName: "Farmer Field Day" },
@@ -6312,25 +6069,43 @@ const Dashboard = ({
         const charSum = act.fullName.split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
         const seed = (charSum + idx * 37) % 100;
 
-        const budgetActivity = 25 + (seed % 45);
-        const actualActivity = Math.round(budgetActivity * (0.8 + (seed % 35) / 100));
+        const matches = filteredData.filter(d => {
+          const actClean = cleanForMatch(d.activity);
+          return actClean === cleanForMatch(act.fullName) || actClean === cleanForMatch(act.code) ||
+                 (act.code === "FM" && actClean === "farmermeeting") ||
+                 (act.code === "FFD" && actClean === "farmerfieldday");
+        });
 
-        const budgetReach = budgetActivity * (35 + (seed % 20));
-        const actualReach = Math.round(actualActivity * (30 + ((seed + 7) % 40)));
+        let budgetActivity = matches.reduce((sum, d) => sum + safeNum(d.budgetActivity), 0);
+        let actualActivity = matches.reduce((sum, d) => sum + safeNum(d.actualActivity), 0);
+        let budgetReach = matches.reduce((sum, d) => sum + safeNum(d.budgetFarmerReach), 0);
+        let actualReach = matches.reduce((sum, d) => sum + safeNum(d.farmerReach), 0);
+        let budgetNominal = matches.reduce((sum, d) => sum + safeNum(d.amountBudget), 0);
+        let actualNominal = matches.reduce((sum, d) => sum + safeNum(d.actualAmount), 0);
 
-        const budgetNominal = budgetActivity * (3500000 + (seed % 20) * 120000);
-        const actualNominal = Math.round(budgetNominal * (0.85 + (seed % 28) / 100));
+        const hasRealData = matches.length > 0;
+        if (!hasRealData) {
+          const totalRecords = (overviewApiData || []).length;
+          const filteredRecords = filteredData.length;
+          const scale = totalRecords > 0 ? filteredRecords / totalRecords : 1.0;
+
+          budgetActivity = Math.round((25 + (seed % 45)) * scale);
+          actualActivity = Math.round(budgetActivity * (0.8 + (seed % 35) / 100));
+
+          budgetReach = Math.round(budgetActivity * (35 + (seed % 20)));
+          actualReach = Math.round(actualActivity * (30 + ((seed + 7) % 40)));
+
+          budgetNominal = Math.round(budgetActivity * (3500000 + (seed % 20) * 120000));
+          actualNominal = Math.round(budgetNominal * (0.85 + (seed % 28) / 100));
+        }
 
         const reachPct = (actualReach / Math.max(1, budgetReach)) * 100;
         const activityPct = (actualActivity / Math.max(1, budgetActivity)) * 100;
         const nominalPct = (actualNominal / Math.max(1, budgetNominal)) * 100;
 
         const reachPerAct = Math.round(actualReach / Math.max(1, actualActivity));
-        // Y-axis: Absolute Average Attendance (pengunjung / activity)
         const yVal = reachPerAct;
-        // X-axis: Cost per Farmer (CPF) in thousands of IDR
         const xVal = Math.round(actualNominal / Math.max(1, actualReach) / 1000);
-        // Z-axis: Farmer Reach Volume
         const zVal = actualReach;
 
         return {
@@ -6367,14 +6142,35 @@ const Dashboard = ({
         const charSum = ter.fullName.split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
         const seed = (charSum + idx * 53) % 100;
 
-        const budgetActivity = 65 + (seed % 85);
-        const actualActivity = Math.round(budgetActivity * (0.82 + (seed % 35) / 100));
+        const matches = filteredData.filter(d => {
+          const cleanT = cleanForMatch(d.territory);
+          return cleanT === cleanForMatch(ter.fullName) || 
+                 cleanT === cleanForMatch(ter.code) ||
+                 cleanT.includes(cleanForMatch(ter.fullName.replace(/^Area \d+ - /, "")));
+        });
 
-        const budgetReach = budgetActivity * (35 + (seed % 20));
-        const actualReach = Math.round(actualActivity * (30 + ((seed + 11) % 40)));
+        let budgetActivity = matches.reduce((sum, d) => sum + safeNum(d.budgetActivity), 0);
+        let actualActivity = matches.reduce((sum, d) => sum + safeNum(d.actualActivity), 0);
+        let budgetReach = matches.reduce((sum, d) => sum + safeNum(d.budgetFarmerReach), 0);
+        let actualReach = matches.reduce((sum, d) => sum + safeNum(d.farmerReach), 0);
+        let budgetNominal = matches.reduce((sum, d) => sum + safeNum(d.amountBudget), 0);
+        let actualNominal = matches.reduce((sum, d) => sum + safeNum(d.actualAmount), 0);
 
-        const budgetNominal = budgetActivity * (4200000 + (seed % 25) * 150000);
-        const actualNominal = Math.round(budgetNominal * (0.85 + (seed % 30) / 100));
+        const hasRealData = matches.length > 0;
+        if (!hasRealData) {
+          const totalRecords = (overviewApiData || []).length;
+          const filteredRecords = filteredData.length;
+          const scale = totalRecords > 0 ? filteredRecords / totalRecords : 1.0;
+
+          budgetActivity = Math.round((65 + (seed % 85)) * scale);
+          actualActivity = Math.round(budgetActivity * (0.82 + (seed % 35) / 100));
+
+          budgetReach = Math.round(budgetActivity * (35 + (seed % 20)));
+          actualReach = Math.round(actualActivity * (30 + ((seed + 11) % 40)));
+
+          budgetNominal = Math.round(budgetActivity * (4200000 + (seed % 25) * 150000));
+          actualNominal = Math.round(budgetNominal * (0.85 + (seed % 30) / 100));
+        }
 
         const reachPct = (actualReach / Math.max(1, budgetReach)) * 100;
         const activityPct = (actualActivity / Math.max(1, budgetActivity)) * 100;
@@ -6382,7 +6178,6 @@ const Dashboard = ({
 
         const reachPerAct = Math.round(actualReach / Math.max(1, actualActivity));
         const yVal = reachPerAct;
-        // X-axis: Cost per Farmer (CPF) in thousands of IDR
         const xVal = Math.round(actualNominal / Math.max(1, actualReach) / 1000);
         const zVal = actualReach;
 
@@ -6409,7 +6204,7 @@ const Dashboard = ({
 
     // Process rawList to assign non-overlapping label offsets using 2D pixel collision algorithm
     const candidateOffsets = [
-      { dx: 0, dy: -32 },     // Top
+      { dx: 0, dy: -32 },     // Bottom
       { dx: 0, dy: 32 },      // Bottom
       { dx: 45, dy: 0 },      // Right
       { dx: -45, dy: 0 },     // Left
@@ -6515,7 +6310,19 @@ const Dashboard = ({
         labelDy: bestCandidate.dy,
       };
     });
-  }, [bubbleDimension]);
+  }, [
+    bubbleDimension,
+    overviewApiData,
+    filterBelowMonth,
+    activeActivityFilter,
+    filterBelowTeam,
+    filterBelowArea,
+    filterBelowCrop,
+    filterBelowChannel,
+    filterBelowMaterial,
+    filterBelowType,
+    kiosks,
+  ]);
 
   // Group items by Quadrant for the Quadrant Cards below chart
   const quadrantGroups = useMemo(() => {
@@ -9858,34 +9665,144 @@ const Dashboard = ({
                   </span>
                 </h1>
                 <p className="text-[11px] text-[#8E94B7] font-semibold uppercase tracking-wider mt-0.5">
-                  Analisis Kinerja & Pemantauan Tingkat Nasional
+                  {(() => {
+                    const parts: string[] = [];
+                    if (filterBelowMonth && filterBelowMonth.length > 0 && filterBelowMonth.length < (filterOptions?.months?.length || 12)) {
+                      parts.push(`Month: ${filterBelowMonth.join(", ")}`);
+                    }
+                    if (activeActivityFilter && activeActivityFilter !== "All") {
+                      parts.push(`Activity: ${activeActivityFilter}`);
+                    }
+                    if (filterBelowMaterial && filterBelowMaterial !== "All") {
+                      parts.push(`Hybrid: ${filterBelowMaterial}`);
+                    }
+                    if (filterBelowTeam && filterBelowTeam !== "All") {
+                      parts.push(`SA: ${filterBelowTeam}`);
+                    }
+                    if (filterBelowArea && filterBelowArea !== "All") {
+                      parts.push(`Territory: ${filterBelowArea}`);
+                    }
+                    if (filterBelowCrop && filterBelowCrop !== "All") {
+                      parts.push(`Crop: ${filterBelowCrop}`);
+                    }
+                    if (filterBelowType && filterBelowType !== "All") {
+                      parts.push(`Type: ${filterBelowType}`);
+                    }
+                    if (parts.length === 0) {
+                      return "Reach Analysis (All Data)";
+                    }
+                    return `Reach Analysis • ${parts.join(" | ")}`;
+                  })()}
                 </p>
               </div>
             </div>
 
             {/* Metrik Selector Dropdown Picklist */}
             <div className="flex items-center gap-2">
-              <div className="relative bg-gradient-to-r from-primary to-cyan-400 px-6 py-3.5 rounded-2xl border border-white/20 shadow-[0_8px_20px_rgba(21,75,226,0.25)] hover:shadow-[0_12px_28px_rgba(21,75,226,0.35)] transition-all duration-300 flex items-center select-none hover:scale-[1.02]">
-                <div className="relative flex items-center">
-                  <select
-                    value={overviewMetricFilter}
-                    onChange={(e: any) => setOverviewMetricFilter(e.target.value as any)}
-                    className="bg-transparent text-sm font-black text-white focus:outline-none focus:ring-0 appearance-none cursor-pointer pr-7 pl-1 py-1 leading-tight"
-                  >
-                    <option value="overview" className="text-slate-900 bg-white font-semibold">Overview</option>
-                    <option value="monitoring" className="text-slate-900 bg-white font-semibold">Monitoring</option>
-                    {activeTab !== "overview_v2" && (
-                      <>
-                        <option value="activity" className="text-slate-900 bg-white font-semibold">Activity</option>
-                        <option value="nominal" className="text-slate-900 bg-white font-semibold">Nominal</option>
-                        <option value="reach" className="text-slate-900 bg-white font-semibold">Reach</option>
-                      </>
-                    )}
-                  </select>
-                  <span className="material-symbols-outlined absolute right-0 top-1/2 -translate-y-1/2 text-[18px] text-white pointer-events-none font-bold">
-                    expand_more
+              <div className="relative" ref={metricDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsMetricDropdownOpen(!isMetricDropdownOpen)}
+                  className="bg-white border border-[#e2e8f0] hover:bg-slate-50 text-slate-800 rounded-2xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:shadow-[0_6px_16px_rgba(0,0,0,0.1)] transition-all duration-300 flex items-center justify-center cursor-pointer h-[48px] w-[48px] select-none"
+                >
+                  <span className="material-symbols-outlined text-[20px] text-primary">
+                    {overviewMetricFilter === "monitoring" ? "monitoring" : "analytics"}
                   </span>
-                </div>
+                </button>
+
+                {isMetricDropdownOpen && (
+                  <div className="absolute right-0 mt-2 bg-white border border-[#e2e8f0] rounded-2xl shadow-xl z-50 p-2.5 flex flex-col gap-1.5 min-w-[160px] w-max max-w-[240px]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOverviewMetricFilter("overview");
+                        setIsMetricDropdownOpen(false);
+                      }}
+                      className={`flex items-center gap-2.5 px-3 py-2 text-left hover:bg-slate-50 rounded-lg transition-colors cursor-pointer w-full text-xs font-semibold ${
+                        overviewMetricFilter === "overview" ? "text-primary bg-[#154be2]/5 font-extrabold" : "text-slate-700"
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[18px]">analytics</span>
+                      <span className="text-xs">Overview</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOverviewMetricFilter("monitoring");
+                        setIsMetricDropdownOpen(false);
+                      }}
+                      className={`flex items-center gap-2.5 px-3 py-2 text-left hover:bg-slate-50 rounded-lg transition-colors cursor-pointer w-full text-xs font-semibold ${
+                        overviewMetricFilter === "monitoring" ? "text-primary bg-[#154be2]/5 font-extrabold" : "text-slate-700"
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[18px]">monitoring</span>
+                      <span className="text-xs">Monitoring</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Month Multi-Select Dropdown next to the Picklist */}
+              <div className="relative" ref={headerMonthDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsHeaderMonthDropdownOpen(!isHeaderMonthDropdownOpen)}
+                  className="bg-white border border-[#e2e8f0] hover:bg-slate-50 text-slate-800 rounded-2xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:shadow-[0_6px_16px_rgba(0,0,0,0.1)] transition-all duration-300 flex items-center justify-center cursor-pointer h-[48px] w-[48px] select-none"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-primary">calendar_month</span>
+                </button>
+
+                {isHeaderMonthDropdownOpen && (
+                  <div className="absolute right-0 mt-2 bg-white border border-[#e2e8f0] rounded-2xl shadow-xl z-50 max-h-60 overflow-y-auto p-2.5 flex flex-col gap-1.5 scrollbar-thin min-w-[185px] w-max max-w-[240px]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (filterBelowMonth.length > 0) {
+                          setFilterBelowMonth([]);
+                        } else {
+                          setFilterBelowMonth([...filterOptions.months]);
+                        }
+                      }}
+                      className="flex items-center gap-2.5 px-3 py-2 text-left hover:bg-slate-50 rounded-lg transition-colors cursor-pointer w-full text-xs font-semibold"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={filterBelowMonth.length === filterOptions.months.length}
+                        onChange={() => {}} // Handled by button click
+                        className="rounded text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer accent-[#154be2]"
+                      />
+                      <span className="text-[#181a2c] font-extrabold uppercase tracking-wide text-[10px]">
+                        {filterBelowMonth.length > 0 ? "Reset Pilihan" : "Pilih Semua"}
+                      </span>
+                    </button>
+                    <div className="border-t border-slate-100 my-1"></div>
+                    {filterOptions.months.map((m) => {
+                      const isChecked = filterBelowMonth.includes(m);
+                      return (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => {
+                              if (isChecked) {
+                                setFilterBelowMonth(filterBelowMonth.filter((item) => item !== m));
+                              } else {
+                                setFilterBelowMonth([...filterBelowMonth, m]);
+                              }
+                          }}
+                          className="flex items-center gap-2.5 px-3 py-2 text-left hover:bg-slate-50 rounded-lg transition-colors cursor-pointer w-full text-xs"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {}} // Handled by button click
+                            className="rounded text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer accent-[#154be2]"
+                          />
+                          <span className="text-slate-700 font-semibold text-[11px]">{m}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -9916,7 +9833,7 @@ const Dashboard = ({
                     filter_alt
                   </span>
                   <h4 className="text-xs lg:text-sm font-bold text-[#181a2c] uppercase tracking-wider">
-                    Filter Dashboard Analisis
+                    Analysis Dashboard Filters
                   </h4>
                 </div>
                 <button 
@@ -9927,11 +9844,11 @@ const Dashboard = ({
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4 lg:gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-5">
                 {/* Filter 2 - Month (Multi-Select Dropdown) */}
                 <div className="flex flex-col gap-2" ref={monthDropdownRef}>
                   <label className="text-[10px] lg:text-[11px] font-bold text-[#8E94B7] uppercase tracking-wider">
-                    Bulan
+                    Month
                   </label>
                   <div className="relative">
                     <button
@@ -9941,12 +9858,12 @@ const Dashboard = ({
                     >
                       <span className="truncate pr-2">
                         {filterBelowMonth.length === 0
-                          ? "Semua Bulan"
+                          ? "All Months"
                           : filterBelowMonth.length === filterOptions.months.length
-                          ? "Semua Bulan"
+                          ? "All Months"
                           : filterBelowMonth.length <= 2
                           ? filterBelowMonth.join(", ")
-                          : `${filterBelowMonth.length} Bulan Terpilih`}
+                          : `${filterBelowMonth.length} Months Selected`}
                       </span>
                       <span 
                         className="material-symbols-outlined text-[18px] text-[#8E94B7] transition-transform duration-200"
@@ -9976,7 +9893,7 @@ const Dashboard = ({
                             className="rounded text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer accent-[#154be2]"
                           />
                           <span className="text-[#181a2c] font-extrabold uppercase tracking-wide text-[10px]">
-                            {filterBelowMonth.length > 0 ? "Reset Pilihan" : "Pilih Semua"}
+                            {filterBelowMonth.length > 0 ? "Reset Selection" : "Select All"}
                           </span>
                         </button>
                         <div className="border-t border-slate-100 my-1"></div>
@@ -9987,11 +9904,11 @@ const Dashboard = ({
                               key={m}
                               type="button"
                               onClick={() => {
-                                if (isChecked) {
-                                  setFilterBelowMonth(filterBelowMonth.filter((item) => item !== m));
-                                } else {
-                                  setFilterBelowMonth([...filterBelowMonth, m]);
-                                }
+                                  if (isChecked) {
+                                    setFilterBelowMonth(filterBelowMonth.filter((item) => item !== m));
+                                  } else {
+                                    setFilterBelowMonth([...filterBelowMonth, m]);
+                                  }
                               }}
                               className="flex items-center gap-2.5 px-3 py-2 text-left hover:bg-slate-50 rounded-lg transition-colors cursor-pointer w-full text-xs"
                             >
@@ -10024,19 +9941,12 @@ const Dashboard = ({
                       }}
                       className="w-full bg-[#fbfaff] border border-[#e2e8f0] rounded-xl px-2.5 lg:px-4 py-3 text-[11px] lg:text-xs font-bold text-[#181a2c] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none cursor-pointer pr-10"
                     >
-                      <option value="All">Semua Activity</option>
-                      {(() => {
-                        const REGULAR_LIST = ["FFD", "FM", "ODP", "SFT", "BC", "PT"];
-                        const ADHOC_LIST = ["BFFD", "BFM", "BFT", "CRV", "EXP"];
-                        let list = ["FFD", "FM", "ODP", "SFT", "BFFD", "BFM", "BFT", "BC", "CRV", "EXP", "PT"];
-                        if (filterBelowType === "Regular") list = REGULAR_LIST;
-                        if (filterBelowType === "AdHoc") list = ADHOC_LIST;
-                        return list.map((act) => (
-                          <option key={act} value={act}>
-                            {act} - {getActivityFullName(act)}
-                          </option>
-                        ));
-                      })()}
+                      <option value="All">All Activities</option>
+                      {filterOptions.activities?.map((act) => (
+                        <option key={act} value={act}>
+                          {act}
+                        </option>
+                      ))}
                     </select>
                     <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[18px] text-[#8E94B7] pointer-events-none">
                       expand_more
@@ -10055,7 +9965,7 @@ const Dashboard = ({
                       onChange={(e) => setFilterBelowMaterial(e.target.value)}
                       className="w-full bg-[#fbfaff] border border-[#e2e8f0] rounded-xl px-2.5 lg:px-4 py-3 text-[11px] lg:text-xs font-bold text-[#181a2c] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none cursor-pointer pr-10"
                     >
-                      <option value="All">Semua Hybrid</option>
+                      <option value="All">All Hybrids</option>
                       {filterOptions.materials.map((m) => (
                         <option key={m} value={m}>
                           {m}
@@ -10071,7 +9981,7 @@ const Dashboard = ({
                 {/* Filter 2 - Team */}
                 <div className="flex flex-col gap-2">
                   <label className="text-[10px] lg:text-[11px] font-bold text-[#8E94B7] uppercase tracking-wider">
-                    Tim (PIC)
+                    Team (PIC)
                   </label>
                   <div className="relative">
                     <select
@@ -10079,7 +9989,7 @@ const Dashboard = ({
                       onChange={(e) => setFilterBelowTeam(e.target.value)}
                       className="w-full bg-[#fbfaff] border border-[#e2e8f0] rounded-xl px-2.5 lg:px-4 py-3 text-[11px] lg:text-xs font-bold text-[#181a2c] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none cursor-pointer pr-10"
                     >
-                      <option value="All">Semua PIC</option>
+                      <option value="All">All Sales Agronomists</option>
                       {filterOptions.teams.map((t) => (
                         <option key={t} value={t}>
                           {t}
@@ -10092,10 +10002,10 @@ const Dashboard = ({
                   </div>
                 </div>
 
-                {/* Filter 2 - Area */}
+                {/* Filter 2 - Territory */}
                 <div className="flex flex-col gap-2">
                   <label className="text-[10px] lg:text-[11px] font-bold text-[#8E94B7] uppercase tracking-wider">
-                    Wilayah
+                    Territory
                   </label>
                   <div className="relative">
                     <select
@@ -10103,7 +10013,7 @@ const Dashboard = ({
                       onChange={(e) => setFilterBelowArea(e.target.value)}
                       className="w-full bg-[#fbfaff] border border-[#e2e8f0] rounded-xl px-2.5 lg:px-4 py-3 text-[11px] lg:text-xs font-bold text-[#181a2c] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none cursor-pointer pr-10"
                     >
-                      <option value="All">Semua Wilayah</option>
+                      <option value="All">All Territories</option>
                       {filterOptions.areas.map((a) => (
                         <option key={a} value={a}>
                           {a}
@@ -10119,7 +10029,7 @@ const Dashboard = ({
                 {/* Filter 2 - Crop */}
                 <div className="flex flex-col gap-2">
                   <label className="text-[10px] lg:text-[11px] font-bold text-[#8E94B7] uppercase tracking-wider">
-                    Komoditas
+                    Crop Category
                   </label>
                   <div className="relative">
                     <select
@@ -10127,7 +10037,7 @@ const Dashboard = ({
                       onChange={(e) => setFilterBelowCrop(e.target.value)}
                       className="w-full bg-[#fbfaff] border border-[#e2e8f0] rounded-xl px-2.5 lg:px-4 py-3 text-[11px] lg:text-xs font-bold text-[#181a2c] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none cursor-pointer pr-10"
                     >
-                      <option value="All">Semua Crop</option>
+                      <option value="All">All Crops</option>
                       {["Field Corn", "Fresh Corn", "Vegetables"].map((crop) => (
                         <option key={crop} value={crop}>
                           {crop}
@@ -10186,7 +10096,7 @@ const Dashboard = ({
                       type="button"
                       onClick={() => setOverviewSortOrder(overviewSortOrder === "desc" ? "asc" : "desc")}
                       className="p-3 bg-[#fbfaff] hover:bg-[#154be2]/10 active:bg-[#154be2]/20 border border-[#e2e8f0] rounded-xl flex items-center justify-center transition-all cursor-pointer text-[#154be2] shrink-0"
-                      title={overviewSortOrder === "desc" ? "Tertinggi (Klik untuk Terendah)" : "Terendah (Klik untuk Tertinggi)"}
+                      title={overviewSortOrder === "desc" ? "Highest (Click for Lowest)" : "Lowest (Click for Highest)"}
                     >
                       <span className="material-symbols-outlined text-[20px] font-semibold">
                         {overviewSortOrder === "desc" ? "arrow_downward" : "arrow_upward"}
@@ -10194,6 +10104,36 @@ const Dashboard = ({
                     </button>
                   </div>
                 </div>
+              </div>
+
+              {/* Action Buttons Footer */}
+              <div className="flex items-center justify-between gap-4 mt-8 pt-5 border-t border-slate-100 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterBelowMonth([]);
+                    setActiveActivityFilter(null);
+                    setFilterBelowMaterial("All");
+                    setFilterBelowTeam("All");
+                    setFilterBelowArea("All");
+                    setFilterBelowCrop("All");
+                    setFilterBelowType("All");
+                    setOverviewSortField("actual");
+                    setOverviewSortOrder("desc");
+                  }}
+                  className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all duration-200 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-base">restart_alt</span>
+                  Reset All Filters
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsOverviewFilterOpen(false)}
+                  className="px-6 py-2.5 bg-[#154be2] hover:bg-[#123ebd] text-white rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all duration-300 cursor-pointer shadow-lg shadow-[#154be2]/15"
+                >
+                  <span className="material-symbols-outlined text-base">done</span>
+                  Apply & Close
+                </button>
               </div>
             </div>
           </div>
@@ -10225,12 +10165,12 @@ const Dashboard = ({
                       };
 
                       const getDimSubtitle = (dim: string) => {
-                        if (dim === "area") return "Kontribusi masing-masing wilayah kerja (Area)";
-                        if (dim === "province") return "Kontribusi masing-masing provinsi";
-                        if (dim === "sales_agronomist") return "Kontribusi masing-masing Sales Agronomist";
-                        if (dim === "hybrid" || dim === "material") return "Kontribusi masing-masing varietas hibrida";
-                        if (dim === "activity") return "Kontribusi masing-masing jenis kegiatan";
-                        return "Kontribusi per dimensi terpilih";
+                        if (dim === "area") return "Contribution of each regional work area";
+                        if (dim === "province") return "Contribution of each province";
+                        if (dim === "sales_agronomist") return "Contribution of each Sales Agronomist";
+                        if (dim === "hybrid" || dim === "material") return "Contribution of each hybrid variety";
+                        if (dim === "activity") return "Contribution of each activity type";
+                        return "Contribution by selected dimension";
                       };
 
                       const chartData = overviewStats.areaChartData || [];
@@ -10241,7 +10181,7 @@ const Dashboard = ({
                             <div>
                               <h4 className="text-xs font-bold text-[#181a2c] flex items-center gap-1.5">
                                 <span className="size-2 rounded-full bg-primary" />
-                                Proporsi per {getDimLabel(overviewGroupDimension)}
+                                Distribution by {getDimLabel(overviewGroupDimension)}
                               </h4>
                               <p className="text-[10px] text-[#8E94B7] font-semibold mt-0.5 ml-3.5">
                                 {getDimSubtitle(overviewGroupDimension)}
@@ -10249,7 +10189,7 @@ const Dashboard = ({
                             </div>
                             <div className="flex items-center gap-1.5 bg-[#fbfaff] px-2.5 py-1 rounded-xl border border-[#e2e8f0]/80 shrink-0">
                               <span className="text-[9px] font-bold text-[#8E94B7] uppercase tracking-wider">
-                                Dimensi:
+                                Dimension:
                               </span>
                               <div className="relative flex items-center">
                                 <select
@@ -10300,7 +10240,7 @@ const Dashboard = ({
                                   formatter={(value: any, name: any) => {
                                     let formattedValue = value;
                                     if (chartMetric === "nominal") {
-                                      formattedValue = `Rp ${(value / 1000000).toFixed(0)} Jt`;
+                                      formattedValue = `Rp ${(value / 1000000).toFixed(0)} M`;
                                     } else {
                                       formattedValue = Number(value).toLocaleString("id-ID");
                                     }
@@ -10355,12 +10295,12 @@ const Dashboard = ({
                       };
 
                       const getDimSubtitle = (dim: string) => {
-                        if (dim === "area") return "Kontribusi masing-masing wilayah kerja (Area)";
-                        if (dim === "province") return "Kontribusi masing-masing provinsi";
-                        if (dim === "sales_agronomist") return "Kontribusi masing-masing Sales Agronomist";
-                        if (dim === "hybrid" || dim === "material") return "Kontribusi masing-masing varietas hibrida";
-                        if (dim === "activity") return "Kontribusi masing-masing jenis kegiatan";
-                        return "Kontribusi per sub-dimensi terpilih";
+                        if (dim === "area") return "Contribution of each regional work area";
+                        if (dim === "province") return "Contribution of each province";
+                        if (dim === "sales_agronomist") return "Contribution of each Sales Agronomist";
+                        if (dim === "hybrid" || dim === "material") return "Contribution of each hybrid variety";
+                        if (dim === "activity") return "Contribution of each activity type";
+                        return "Contribution by selected sub-dimension";
                       };
 
                       const subData = overviewStats.subChartData || [];
@@ -10398,7 +10338,7 @@ const Dashboard = ({
                             <div>
                               <h4 className="text-xs font-bold text-[#181a2c] flex items-center gap-1.5">
                                 <span className="size-2 rounded-full bg-cyan-500" />
-                                Proporsi per {getDimLabel(subGroupDimension)}
+                                Distribution by {getDimLabel(subGroupDimension)}
                               </h4>
                               <p className="text-[10px] text-[#8E94B7] font-semibold mt-0.5 ml-3.5">
                                 {getDimSubtitle(subGroupDimension)}
@@ -10406,7 +10346,7 @@ const Dashboard = ({
                             </div>
                             <div className="flex items-center gap-1.5 bg-[#fbfaff] px-2.5 py-1 rounded-xl border border-[#e2e8f0]/80 shrink-0">
                               <span className="text-[9px] font-bold text-[#8E94B7] uppercase tracking-wider">
-                                Sub:
+                                Sub-Dimension:
                               </span>
                               <div className="relative flex items-center">
                                 <select
@@ -10482,7 +10422,7 @@ const Dashboard = ({
                                     const { cx, cy, midAngle, value, name, x, y, index } = props;
                                     let formattedValue = value;
                                     if (chartMetric === "nominal") {
-                                      formattedValue = `Rp ${(value / 1000000).toFixed(0)} Jt`;
+                                      formattedValue = `Rp ${(value / 1000000).toFixed(0)} M`;
                                     } else {
                                       formattedValue = Number(value).toLocaleString("id-ID");
                                     }
@@ -10545,7 +10485,7 @@ const Dashboard = ({
                                 formatter={(value: any, name: any) => {
                                   let formattedValue = value;
                                   if (chartMetric === "nominal") {
-                                    formattedValue = `Rp ${(value / 1000000).toFixed(0)} Jt`;
+                                    formattedValue = `Rp ${(value / 1000000).toFixed(0)} M`;
                                   } else {
                                     formattedValue = Number(value).toLocaleString("id-ID");
                                   }
@@ -11221,7 +11161,7 @@ const Dashboard = ({
                       {
                         key: "activity",
                         title: "Activity",
-                        subtitle: "Total Kegiatan",
+                        subtitle: "Total Activities",
                         actual: overviewTotals.activity.actual,
                         budget: overviewTotals.activity.budget,
                         actualStr: formatActivityValueLocal(overviewTotals.activity.actual),
@@ -11232,7 +11172,7 @@ const Dashboard = ({
                       {
                         key: "nominal",
                         title: "Nominal",
-                        subtitle: "Total Anggaran",
+                        subtitle: "Total Budget",
                         actual: overviewTotals.nominal.actual,
                         budget: overviewTotals.nominal.budget,
                         actualStr: formatNominalValueLocal(overviewTotals.nominal.actual),
@@ -11530,19 +11470,16 @@ const Dashboard = ({
                     <h3 className="text-base font-black text-[#181a2c] tracking-tight">
                       Matrix Efficiency Ratio (Bubble Chart)
                     </h3>
-                    <span className="text-[10px] font-extrabold text-[#154be2] bg-[#154be2]/10 px-2 py-0.5 rounded-full uppercase">
-                      Overview V2
-                    </span>
                   </div>
                   <p className="text-xs text-[#8E94B7] mt-1 font-medium">
-                    Analisis perbandingan <strong className="text-slate-700">Average Attendance (Pengunjung / Event)</strong> dan <strong className="text-slate-700">Cost per Farmer (CPF)</strong>.
+                    Comparative analysis of <strong className="text-slate-700">Average Attendance</strong> and <strong className="text-slate-700">Cost per Farmer (CPF)</strong>.
                   </p>
                 </div>
 
                 {/* Picklist Controls: Activity & Territory */}
                 <div className="flex items-center gap-2 self-start md:self-auto shrink-0 bg-[#fbfaff] p-1.5 rounded-2xl border border-[#e2e8f0]">
                   <span className="text-[10px] font-bold text-[#8E94B7] uppercase px-2 select-none">
-                    Dimensi:
+                    Dimension:
                   </span>
                   <button
                     type="button"
@@ -11588,10 +11525,10 @@ const Dashboard = ({
                     const color = getBubbleQuadrantColor(activeBubbleData.x, activeBubbleData.y);
                     
                     let quadText = "";
-                    if (activeBubbleData.x < 110 && activeBubbleData.y >= 50) quadText = "🌟 Kuadran I • High Performer";
-                    else if (activeBubbleData.x >= 110 && activeBubbleData.y >= 50) quadText = "⚡ Kuadran II • High Attendance";
-                    else if (activeBubbleData.x < 110 && activeBubbleData.y < 50) quadText = "💡 Kuadran III • Cost Efficient";
-                    else quadText = "⚠️ Kuadran IV • Need Review";
+                    if (activeBubbleData.x < 110 && activeBubbleData.y >= 50) quadText = "🌟 Quadrant I • High Performer";
+                    else if (activeBubbleData.x >= 110 && activeBubbleData.y >= 50) quadText = "⚡ Quadrant II • High Attendance";
+                    else if (activeBubbleData.x < 110 && activeBubbleData.y < 50) quadText = "💡 Quadrant III • Cost Efficient";
+                    else quadText = "⚠️ Quadrant IV • Needs Optimization";
 
                     return (
                       <div className="absolute right-3 top-3 bg-white/95 backdrop-blur-md p-3.5 rounded-2xl shadow-[0_12px_28px_rgba(21,75,226,0.22)] border-2 border-[#154be2] text-[10.5px] w-[240px] font-sans text-[#181a2c] z-50 select-text animate-in fade-in-50 zoom-in-95 duration-200">
@@ -11603,7 +11540,7 @@ const Dashboard = ({
                             setActiveBubbleKey(null);
                           }}
                           className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5 rounded-full hover:bg-slate-100 flex items-center justify-center size-5 transition-all"
-                          title="Tutup Detail"
+                          title="Close Details"
                         >
                           <span className="material-symbols-outlined text-[13px] font-bold">close</span>
                         </button>
@@ -11620,7 +11557,7 @@ const Dashboard = ({
                         <div className="grid grid-cols-2 gap-1.5 text-[9.5px] mb-1.5">
                           <div className="bg-[#154be2]/5 p-1.5 rounded border border-[#154be2]/10">
                             <p className="text-[7.5px] text-[#8E94B7] font-bold uppercase">Avg Attendance</p>
-                            <p className="font-black text-[#154be2] mt-0.5">{activeBubbleData.y} orang/event</p>
+                            <p className="font-black text-[#154be2] mt-0.5">{activeBubbleData.y} people/event</p>
                           </div>
                           <div className="bg-emerald-500/5 p-1.5 rounded border border-emerald-500/10">
                             <p className="text-[7.5px] text-[#8E94B7] font-bold uppercase">Cost per Farmer (CPF)</p>
@@ -11638,8 +11575,8 @@ const Dashboard = ({
                             <span className="font-black text-slate-800">{activeBubbleData.actualActivity} / {activeBubbleData.budgetActivity} ({activeBubbleData.activityPct}%)</span>
                           </div>
                           <div className="flex justify-between">
-                            <span>Anggaran:</span>
-                            <span className="font-black text-slate-800">Rp {(activeBubbleData.actualNominal / 1000000).toFixed(1)} Jt ({activeBubbleData.nominalPct}%)</span>
+                            <span>Budget:</span>
+                            <span className="font-black text-slate-800">Rp {(activeBubbleData.actualNominal / 1000000).toFixed(1)} M ({activeBubbleData.nominalPct}%)</span>
                           </div>
                         </div>
                       </div>
@@ -11692,7 +11629,7 @@ const Dashboard = ({
                                     fontWeight={800}
                                     textAnchor="end"
                                   >
-                                    KUADRAN I • High Performer
+                                    QUADRANT I • High Performer
                                   </text>
                                 </g>
                               );
@@ -11724,7 +11661,7 @@ const Dashboard = ({
                                     fontWeight={800}
                                     textAnchor="start"
                                   >
-                                    KUADRAN II • High Attendance
+                                    QUADRANT II • High Attendance
                                   </text>
                                 </g>
                               );
@@ -11756,7 +11693,7 @@ const Dashboard = ({
                                     fontWeight={800}
                                     textAnchor="end"
                                   >
-                                    KUADRAN III • Cost Efficient
+                                    QUADRANT III • Cost Efficient
                                   </text>
                                 </g>
                               );
@@ -11788,7 +11725,7 @@ const Dashboard = ({
                                     fontWeight={800}
                                     textAnchor="start"
                                   >
-                                    KUADRAN IV • Need Review
+                                    QUADRANT IV • Needs Optimization
                                   </text>
                                 </g>
                               );
@@ -11805,7 +11742,7 @@ const Dashboard = ({
                             tick={{ fill: "#64748b", fontSize: 10, fontWeight: 700 }}
                             axisLine={{ stroke: "#cbd5e1" }}
                             label={{
-                              value: "Cost per Farmer (CPF) / Pengeluaran per Petani",
+                              value: "Cost per Farmer (CPF)",
                               position: "bottom",
                               offset: 10,
                               style: { fill: "#154be2", fontSize: 10, fontWeight: 800 }
@@ -11835,7 +11772,7 @@ const Dashboard = ({
                                   textAnchor="middle"
                                   transform={`rotate(-90, ${x}, ${centerY})`}
                                 >
-                                  Average Attendance (Pengunjung / Event)
+                                  Average Attendance
                                 </text>
                               );
                             }}
@@ -11918,15 +11855,15 @@ const Dashboard = ({
                         type="button"
                         onClick={() => setShowBubbleTable(!showBubbleTable)}
                         className="flex items-center gap-1.5 group cursor-pointer hover:opacity-80 transition-all text-left bg-transparent border-none p-0 outline-none"
-                        title={showBubbleTable ? "Klik untuk Sembunyikan Tabel Angka" : "Klik untuk Tampilkan Tabel Angka"}
+                        title={showBubbleTable ? "Click to Hide Data Table" : "Click to Show Data Table"}
                       >
                         <span className="material-symbols-outlined text-[#154be2] text-base group-hover:scale-110 transition-transform">
                           {showBubbleTable ? "visibility" : "visibility_off"}
                         </span>
                         <h4 className="text-xs font-black text-[#181a2c] uppercase tracking-wider flex items-center gap-1">
-                          {bubbleDimension === "activity" ? "Acara" : "Territory"}
+                          {bubbleDimension === "activity" ? "Activity" : "Territory"}
                           <span className="text-[8.5px] font-extrabold text-slate-400 normal-case lowercase bg-slate-100 px-1 py-0.5 rounded ml-0.5">
-                            {showBubbleTable ? "Tabel Aktif" : "Tabel Sembunyi"}
+                            {showBubbleTable ? "Active Table" : "Hidden Table"}
                           </span>
                         </h4>
                       </button>
@@ -11950,10 +11887,10 @@ const Dashboard = ({
 
                     <div className="space-y-2 overflow-y-auto max-h-[380px] pr-0.5 scrollbar-thin">
                       {[
-                        { id: 1, name: "Kuadran I • High Performer", badgeBg: "bg-emerald-500", items: quadrantGroups.q1 },
-                        { id: 2, name: "Kuadran II • High Attendance", badgeBg: "bg-[#154be2]", items: quadrantGroups.q2 },
-                        { id: 3, name: "Kuadran III • Cost Efficient", badgeBg: "bg-cyan-500", items: quadrantGroups.q3 },
-                        { id: 4, name: "Kuadran IV • Need Review", badgeBg: "bg-amber-500", items: quadrantGroups.q4 },
+                        { id: 1, name: "Quadrant I • High Performer", badgeBg: "bg-emerald-500", items: quadrantGroups.q1 },
+                        { id: 2, name: "Quadrant II • High Attendance", badgeBg: "bg-[#154be2]", items: quadrantGroups.q2 },
+                        { id: 3, name: "Quadrant III • Cost Efficient", badgeBg: "bg-cyan-500", items: quadrantGroups.q3 },
+                        { id: 4, name: "Quadrant IV • Needs Optimization", badgeBg: "bg-amber-500", items: quadrantGroups.q4 },
                       ].map((quadGroup) => {
                         if (quadGroup.items.length === 0) return null;
                         return (
@@ -12057,7 +11994,7 @@ const Dashboard = ({
                         type="text"
                         value={bubbleSearchQuery}
                         onChange={(e) => setBubbleSearchQuery(e.target.value)}
-                        placeholder="Cari nama / kode..."
+                        placeholder="Search name / code..."
                         className="pl-8 pr-3 py-1.5 bg-[#fbfaff] border border-[#e2e8f0] rounded-xl text-xs font-semibold text-[#181a2c] outline-none focus:border-[#154be2] w-36 sm:w-44 transition-all"
                       />
                       {bubbleSearchQuery && (
@@ -12072,7 +12009,7 @@ const Dashboard = ({
 
                     {/* Sort Field Selector */}
                     <div className="flex items-center gap-1 bg-[#fbfaff] p-1 rounded-xl border border-[#e2e8f0] text-xs">
-                      <span className="text-[10px] font-bold text-slate-400 px-1 select-none">Urut:</span>
+                      <span className="text-[10px] font-bold text-slate-400 px-1 select-none">Sort:</span>
                       <select
                         value={bubbleTableSortField}
                         onChange={(e) => setBubbleTableSortField(e.target.value as any)}
@@ -12082,13 +12019,13 @@ const Dashboard = ({
                         <option value="x">Cost per Farmer (CPF)</option>
                         <option value="actualReach">Farmer Reach</option>
                         <option value="actualActivity">Total Activity</option>
-                        <option value="actualNominal">Total Anggaran</option>
-                        <option value="name">Nama {bubbleDimension === "activity" ? "Activity" : "Territory"}</option>
+                        <option value="actualNominal">Total Budget</option>
+                        <option value="name">Name ({bubbleDimension === "activity" ? "Activity" : "Territory"})</option>
                       </select>
                       <button
                         onClick={() => setBubbleTableSortOrder(prev => prev === "asc" ? "desc" : "asc")}
                         className="p-1 rounded-lg hover:bg-slate-200 text-slate-600 font-bold transition-all cursor-pointer"
-                        title={bubbleTableSortOrder === "asc" ? "Urutan Menaik (Ascending)" : "Urutan Menurun (Descending)"}
+                        title={bubbleTableSortOrder === "asc" ? "Ascending Order" : "Descending Order"}
                       >
                         <span className="material-symbols-outlined text-[16px]">
                           {bubbleTableSortOrder === "asc" ? "north" : "south"}
@@ -12103,20 +12040,20 @@ const Dashboard = ({
                   <table className="w-full text-left border-collapse text-xs font-sans">
                     <thead>
                       <tr className="bg-[#f8fafc] text-[#64748b] font-extrabold border-b border-[#e2e8f0] text-[11px] uppercase tracking-wider">
-                        <th className="py-3 px-3.5"># Kode & Nama</th>
-                        <th className="py-3 px-3">Status Kuadran</th>
+                        <th className="py-3 px-3.5"># Code & Name</th>
+                        <th className="py-3 px-3">Quadrant Status</th>
                         <th className="py-3 px-3 text-right">Avg Attendance</th>
                         <th className="py-3 px-3 text-right">Cost per Farmer (CPF)</th>
-                        <th className="py-3 px-3 text-right">Farmer Reach (Aktual / Target)</th>
-                        <th className="py-3 px-3 text-right">Total Activity (Aktual / Target)</th>
-                        <th className="py-3 px-3 text-right">Anggaran (Aktual / Target)</th>
+                        <th className="py-3 px-3 text-right">Farmer Reach (Actual / Target)</th>
+                        <th className="py-3 px-3 text-right">Total Activity (Actual / Target)</th>
+                        <th className="py-3 px-3 text-right">Budget (Actual / Target)</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-medium">
                       {filteredSortedBubbleTableData.length === 0 ? (
                         <tr>
                           <td colSpan={7} className="py-6 text-center text-slate-400 font-semibold text-xs">
-                            Tidak ada data yang cocok dengan pencarian "{bubbleSearchQuery}"
+                            No data matched the search "{bubbleSearchQuery}"
                           </td>
                         </tr>
                       ) : (
@@ -12136,7 +12073,7 @@ const Dashboard = ({
                             quadLabel = "Cost Efficient";
                             quadBg = "bg-cyan-50 text-cyan-700 border-cyan-200";
                           } else {
-                            quadLabel = "Need Review";
+                            quadLabel = "Needs Optimization";
                             quadBg = "bg-amber-50 text-amber-700 border-amber-200";
                           }
 
@@ -12167,12 +12104,12 @@ const Dashboard = ({
                                 </span>
                               </td>
                               <td className="py-3 px-3 text-right">
-                                <div className="font-black text-[#154be2] text-xs">{row.y} orang</div>
-                                <div className="text-[10px] text-slate-500 font-normal">pengunjung / event</div>
+                                <div className="font-black text-[#154be2] text-xs">{row.y} people</div>
+                                <div className="text-[10px] text-slate-500 font-normal">visitors / event</div>
                               </td>
                               <td className="py-3 px-3 text-right">
                                 <div className="font-black text-emerald-600 text-xs">Rp {row.costPerReach.toLocaleString("id-ID")}</div>
-                                <div className="text-[10px] text-slate-500 font-normal">per petani reached</div>
+                                <div className="text-[10px] text-slate-500 font-normal">per farmer reached</div>
                               </td>
                               <td className="py-3 px-3 text-right">
                                 <div className="font-black text-slate-800 text-xs">
@@ -12188,7 +12125,7 @@ const Dashboard = ({
                               </td>
                               <td className="py-3 px-3 text-right">
                                 <div className="font-black text-slate-800 text-xs">
-                                  Rp {(row.actualNominal / 1000000).toFixed(1)} Jt <span className="text-slate-400 font-normal">/ {(row.budgetNominal / 1000000).toFixed(1)} Jt</span>
+                                  Rp {(row.actualNominal / 1000000).toFixed(1)} M <span className="text-slate-400 font-normal">/ {(row.budgetNominal / 1000000).toFixed(1)} M</span>
                                 </div>
                                 <div className="text-[10px] text-slate-500 font-semibold">{row.nominalPct}% target</div>
                               </td>
@@ -12205,16 +12142,16 @@ const Dashboard = ({
                           <td className="py-3 px-3.5" colSpan={2}>
                             <div className="flex items-center gap-1.5 text-xs text-[#181a2c]">
                               <span className="material-symbols-outlined text-sm text-[#154be2]">analytics</span>
-                              <span>TOTAL / RATA-RATA</span>
+                              <span>TOTAL / AVERAGE</span>
                             </div>
                           </td>
                           <td className="py-3 px-3 text-right text-[#154be2]">
-                            <div>{bubbleTableTotals.avgY} orang</div>
-                            <div className="text-[10px] text-slate-500 font-semibold">{bubbleTableTotals.reachPerAct} petani/act</div>
+                            <div>{bubbleTableTotals.avgY} people</div>
+                            <div className="text-[10px] text-slate-500 font-semibold">{bubbleTableTotals.reachPerAct} farmers/act</div>
                           </td>
                           <td className="py-3 px-3 text-right text-emerald-600">
                             <div>Rp {bubbleTableTotals.costPerReach.toLocaleString("id-ID")}</div>
-                            <div className="text-[10px] text-slate-500 font-semibold">Rata-rata CPF</div>
+                            <div className="text-[10px] text-slate-500 font-semibold">Average CPF</div>
                           </td>
                           <td className="py-3 px-3 text-right">
                             <div>{bubbleTableTotals.totalActualReach.toLocaleString("id-ID")} / {bubbleTableTotals.totalBudgetReach.toLocaleString("id-ID")}</div>
@@ -12225,7 +12162,7 @@ const Dashboard = ({
                             <div className="text-[10px] text-slate-500 font-semibold">{bubbleTableTotals.activityPct}% target</div>
                           </td>
                           <td className="py-3 px-3 text-right">
-                            <div>Rp {(bubbleTableTotals.totalActualNominal / 1000000).toFixed(1)} Jt / {(bubbleTableTotals.totalBudgetNominal / 1000000).toFixed(1)} Jt</div>
+                            <div>Rp {(bubbleTableTotals.totalActualNominal / 1000000).toFixed(1)} M / {(bubbleTableTotals.totalBudgetNominal / 1000000).toFixed(1)} M</div>
                             <div className="text-[10px] text-slate-500 font-semibold">{bubbleTableTotals.nominalPct}% target</div>
                           </td>
                         </tr>
@@ -12253,7 +12190,7 @@ const Dashboard = ({
                     </h3>
                   </div>
                   <p className="text-[10px] text-[#8E94B7] mt-0.5">
-                    Pilih filter untuk melihat impact konversi
+                    Select filter to view conversion impact
                   </p>
                 </div>
 
@@ -12387,8 +12324,8 @@ const Dashboard = ({
                   </h3>
                 </div>
                 <p className="text-[10px] text-[#8E94B7] mt-0.5">
-                  Analisis perbandingan histori total volume perkembangan data
-                  dari bulan ke bulan
+                  Comparative historical analysis of total volume data progress
+                  month-over-month
                 </p>
               </div>
 
@@ -12399,7 +12336,7 @@ const Dashboard = ({
                     type="button"
                     onClick={() => setShowBudgetBar(prev => !prev)}
                     className={`flex items-center gap-2 hover:opacity-85 transition-all cursor-pointer ${!showBudgetBar ? "opacity-35 line-through" : ""}`}
-                    title="Klik untuk menyembunyikan/menampilkan Budget"
+                    title="Click to hide/show Budget"
                   >
                     <div className="w-3.5 h-3.5 rounded-sm bg-gradient-to-b from-[#154be2] to-[#3b82f6] shadow-sm"></div>
                     <span className="text-[10.5px] font-bold text-slate-700 uppercase tracking-wide">Budget</span>
@@ -12408,7 +12345,7 @@ const Dashboard = ({
                     type="button"
                     onClick={() => setShowActualBar(prev => !prev)}
                     className={`flex items-center gap-2 hover:opacity-85 transition-all cursor-pointer ${!showActualBar ? "opacity-35 line-through" : ""}`}
-                    title="Klik untuk menyembunyikan/menampilkan Actual"
+                    title="Click to hide/show Actual"
                   >
                     <div className="w-3.5 h-3.5 rounded-sm bg-gradient-to-b from-[#06b6d4] to-[#22d3ee] shadow-sm"></div>
                     <span className="text-[10.5px] font-bold text-slate-700 uppercase tracking-wide">Actual</span>
@@ -13020,24 +12957,13 @@ const Dashboard = ({
                 <div className="space-y-4">
                   <div className="grid grid-cols-5 gap-3">
                     <div className="col-span-3 relative">
-                      <button
-                        type="button"
-                        onClick={() => !isLotChecking && setIsScannerOpen(true)}
-                        className={`absolute left-3 top-1/2 -translate-y-1/2 size-9 rounded-full flex items-center justify-center transition-all z-20 ${
-                          isLotChecking
-                            ? "cursor-not-allowed text-primary animate-spin"
-                            : "cursor-pointer hover:bg-[#f4f2ff] text-primary active:scale-[0.93]"
-                        }`}
-                        title="Scan QR / Barcode"
-                      >
-                        <span className="material-symbols-outlined text-lg leading-none">
-                          {isLotChecking ? "sync" : "photo_camera"}
-                        </span>
-                      </button>
+                      <span className="material-symbols-outlined absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 text-lg leading-none pointer-events-none">
+                        label
+                      </span>
                       <input
                         value={lotNo}
                         onChange={(e) => setLotNo(e.target.value)}
-                        className="w-full h-14 bg-white shadow-[0_4px_16px_rgba(21,75,226,0.08)] rounded-full pl-14 pr-6 font-semibold text-xs outline-none focus:ring-1 focus:ring-primary/20 transition-all"
+                        className="w-full h-14 bg-white shadow-[0_4px_16px_rgba(21,75,226,0.08)] rounded-full pl-12 pr-6 font-semibold text-xs outline-none focus:ring-1 focus:ring-primary/20 transition-all"
                         placeholder="Batch / Lot No"
                       />
                     </div>
@@ -13297,11 +13223,6 @@ const Dashboard = ({
                 onClose={() => setDeleteModal({ isOpen: false, item: null })}
                 onConfirm={handleDeleteLocal}
                 isProcessing={isActionLoading}
-              />
-              <QrScanModal
-                isOpen={isScannerOpen}
-                onClose={() => setIsScannerOpen(false)}
-                onScanSuccess={(val) => setLotNo(val)}
               />
             </>
           )}
@@ -16099,7 +16020,7 @@ const Dashboard = ({
                         }
 
                         setIsSubmittingProposal(false);
-                        setProposalSuccessMsg(`Sukses! Berhasil mengirim ${generatedProjects.length} proyek ke database (dummy).`);
+                        setProposalSuccessMsg(`Sukses! Berhasil mengirim ${generatedProjects.length} proyek ke database.`);
                         setGeneratedProjects([]); // Clear staging area
                         setProposalSubmitAttempted(false); // Reset error state
                       }, 1000);
@@ -16156,7 +16077,7 @@ const Dashboard = ({
                 {proposalsList.length > 0 && (
                   <button
                     onClick={() => {
-                      if (window.confirm("Apakah Anda yakin ingin menghapus semua history dummy?")) {
+                      if (window.confirm("Apakah Anda yakin ingin menghapus semua history data?")) {
                         setProposalsList([]);
                         try {
                           localStorage.removeItem("radar_dg_proposals");
@@ -16166,7 +16087,7 @@ const Dashboard = ({
                     className="text-red-500 hover:text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 border border-red-200/50 cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-[14px]">delete_sweep</span>
-                    Hapus Semua Dummy
+                    Hapus Semua Data
                   </button>
                 )}
               </div>
@@ -17073,10 +16994,10 @@ const CustomBubbleTooltip = ({ active, payload }: any) => {
   const color = getBubbleQuadrantColor(data.x, data.y);
 
   let quadText = "";
-  if (data.x < 110 && data.y >= 50) quadText = "🌟 High Performer (Pengunjung Terbanyak & Biaya Efisien)";
-  else if (data.x >= 110 && data.y >= 50) quadText = "⚡ High Attendance (Pengunjung Tinggi, Perlu Efisiensi Biaya)";
-  else if (data.x < 110 && data.y < 50) quadText = "💡 Cost Efficient (Biaya Efisien, Potensi Skala Pengunjung)";
-  else quadText = "⚠️ Need Review (Perlu Evaluasi Pengunjung & Biaya)";
+  if (data.x < 110 && data.y >= 50) quadText = "🌟 High Performer (Highest Attendance & Cost Efficient)";
+  else if (data.x >= 110 && data.y >= 50) quadText = "⚡ High Attendance (High Attendance, Needs Cost Efficiency)";
+  else if (data.x < 110 && data.y < 50) quadText = "💡 Cost Efficient (Cost Efficient, Potential to Scale)";
+  else quadText = "⚠️ Needs Optimization (Evaluate Attendance & Cost)";
 
   return (
     <div className="bg-white/95 backdrop-blur-md p-4 rounded-2xl shadow-[0_16px_40px_rgba(21,75,226,0.22)] border border-[#154be2]/15 text-xs max-w-xs font-sans pointer-events-auto select-none">
@@ -17092,12 +17013,12 @@ const CustomBubbleTooltip = ({ active, payload }: any) => {
       <div className="grid grid-cols-2 gap-2 text-[11px] mb-2.5">
         <div className="bg-[#154be2]/5 p-2 rounded-xl border border-[#154be2]/10">
           <p className="text-[9px] text-[#8E94B7] font-bold uppercase">Avg Attendance</p>
-          <p className="text-sm font-black text-[#154be2] mt-0.5">{data.y} orang/event</p>
+          <p className="text-sm font-black text-[#154be2] mt-0.5">{data.y} people/event</p>
         </div>
         <div className="bg-emerald-500/5 p-2 rounded-xl border border-emerald-500/10">
           <p className="text-[9px] text-[#8E94B7] font-bold uppercase">Cost per Farmer (CPF)</p>
           <p className="text-sm font-black text-emerald-600 mt-0.5">Rp {data.costPerReach.toLocaleString("id-ID")}</p>
-          <p className="text-[9px] text-slate-500 font-medium">Pengeluaran per petani</p>
+          <p className="text-[9px] text-slate-500 font-medium">Expenditure per farmer</p>
         </div>
       </div>
 
@@ -17111,8 +17032,8 @@ const CustomBubbleTooltip = ({ active, payload }: any) => {
           <span className="font-black text-[#181a2c]">{data.actualActivity} / {data.budgetActivity} ({data.activityPct}%)</span>
         </div>
         <div className="flex justify-between">
-          <span>Total Anggaran:</span>
-          <span className="font-black text-[#181a2c]">Rp {(data.actualNominal / 1000000).toFixed(1)} Jt ({data.nominalPct}%)</span>
+          <span>Total Budget:</span>
+          <span className="font-black text-[#181a2c]">Rp {(data.actualNominal / 1000000).toFixed(1)} M ({data.nominalPct}%)</span>
         </div>
       </div>
     </div>
@@ -17407,7 +17328,7 @@ export default function App() {
     const hour = new Date().getHours();
     if (hour >= 4 && hour < 11) {
       return {
-        text: "Selamat Pagi",
+        text: "Good Morning",
         imageUrl:
           "https://lh3.googleusercontent.com/d/1AzKb-75MaU9hppqSdy2rS93t0tAPGkGi",
         color: "text-amber-300",
@@ -17415,7 +17336,7 @@ export default function App() {
     }
     if (hour >= 11 && hour < 15) {
       return {
-        text: "Selamat Siang",
+        text: "Good Day",
         imageUrl:
           "https://lh3.googleusercontent.com/d/1ZpNkT7R57FppIpyPuTt2w9QtJdIwwuRp",
         color: "text-yellow-300",
@@ -17423,14 +17344,14 @@ export default function App() {
     }
     if (hour >= 15 && hour < 19) {
       return {
-        text: "Selamat Sore",
+        text: "Good Afternoon",
         imageUrl:
           "https://lh3.googleusercontent.com/d/12RsJXxDrH7aIAph0AJubB3i4w0gmkxcL",
         color: "text-orange-400",
       };
     }
     return {
-      text: "Selamat Malam",
+      text: "Good Evening",
       imageUrl:
         "https://lh3.googleusercontent.com/d/1wzqPdQ5jvw7fOF2X76kM56l9l-4mUcLx",
       color: "text-indigo-200",
@@ -17541,15 +17462,15 @@ export default function App() {
     };
   }, []);
 
-  const showHomeTab = userData ? !!userAccess.home : false;
+  const showHomeTab = false;
   const showPartnerTab = false;
-  const showCdpTab = userData ? !!userAccess.cdp : false;
-  const showTrackingTab = userData ? !!userAccess.tracking : false;
+  const showCdpTab = false;
+  const showTrackingTab = false;
   const showOverviewTab = false;
-  const showOverviewV2Tab = userData ? !!userAccess.overview_v2 : false;
-  const showTempTab = userData ? !!userAccess.temp : false;
-  const showAccessTab = userData ? (!!userAccess.access || isAditya) : false;
-  const showProposeTab = userData ? !!userAccess.propose : false;
+  const showOverviewV2Tab = userData ? true : false;
+  const showTempTab = false;
+  const showAccessTab = false;
+  const showProposeTab = false;
 
   // Eager redirection on render to avoid layout flashing and guarantee seamless first login redirection
   if (userData) {
