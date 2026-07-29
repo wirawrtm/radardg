@@ -9703,9 +9703,9 @@ addMetrics(area, item);
                 <button
                   type="button"
                   onClick={() => setIsMetricDropdownOpen(!isMetricDropdownOpen)}
-                  className="bg-white border border-[#e2e8f0] hover:bg-slate-50 text-slate-800 rounded-2xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:shadow-[0_6px_16px_rgba(0,0,0,0.1)] transition-all duration-300 flex items-center justify-center cursor-pointer h-[48px] w-[48px] select-none"
+                  className="bg-gradient-to-r from-[#154be2] to-[#3b82f6] text-white hover:opacity-95 rounded-2xl shadow-[0_4px_14px_rgba(21,75,226,0.25)] hover:shadow-[0_6px_20px_rgba(21,75,226,0.35)] hover:scale-[1.02] transition-all duration-300 flex items-center justify-center cursor-pointer h-[48px] w-[48px] select-none border-0"
                 >
-                  <span className="material-symbols-outlined text-[20px] text-primary">
+                  <span className="material-symbols-outlined text-[20px] text-white font-medium">
                     {overviewMetricFilter === "monitoring" ? "monitoring" : "analytics"}
                   </span>
                 </button>
@@ -9747,9 +9747,9 @@ addMetrics(area, item);
                 <button
                   type="button"
                   onClick={() => setIsHeaderMonthDropdownOpen(!isHeaderMonthDropdownOpen)}
-                  className="bg-white border border-[#e2e8f0] hover:bg-slate-50 text-slate-800 rounded-2xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:shadow-[0_6px_16px_rgba(0,0,0,0.1)] transition-all duration-300 flex items-center justify-center cursor-pointer h-[48px] w-[48px] select-none"
+                  className="bg-gradient-to-r from-[#154be2] to-[#3b82f6] text-white hover:opacity-95 rounded-2xl shadow-[0_4px_14px_rgba(21,75,226,0.25)] hover:shadow-[0_6px_20px_rgba(21,75,226,0.35)] hover:scale-[1.02] transition-all duration-300 flex items-center justify-center cursor-pointer h-[48px] w-[48px] select-none border-0"
                 >
-                  <span className="material-symbols-outlined text-[18px] text-primary">calendar_month</span>
+                  <span className="material-symbols-outlined text-[18px] text-white font-medium">calendar_month</span>
                 </button>
 
                 {isHeaderMonthDropdownOpen && (
@@ -10259,6 +10259,7 @@ addMetrics(area, item);
                                   name="Actual"
                                   radius={[12, 12, 12, 12]}
                                   maxBarSize={65}
+                                  isAnimationActive={false}
                                 >
                                   {chartData.map((entry: any, index: number) => {
                                     const colors = ["#154be2", "#06b6d4", "#f59e0b", "#10b981", "#8b5cf6", "#ec4899", "#14b8a6"];
@@ -10759,6 +10760,7 @@ addMetrics(area, item);
                             fill="url(#colorAreaPog)"
                             radius={[12, 12, 12, 12]}
                             maxBarSize={currentMaxBarSize}
+                            isAnimationActive={false}
                             background={<CustomBarBackground data={overviewStats.areaChartData} activeKey={activeMainBarKey} />}
                           >
                             {overviewStats.areaChartData.map((entry: any, index: number) => {
@@ -10805,6 +10807,7 @@ addMetrics(area, item);
                             fill="url(#colorAreaStock)"
                             radius={[12, 12, 12, 12]}
                             maxBarSize={currentMaxBarSize}
+                            isAnimationActive={false}
                             background={<CustomBarBackground data={overviewStats.areaChartData} activeKey={activeMainBarKey} />}
                           >
                             {overviewStats.areaChartData.map((entry: any, index: number) => {
@@ -11038,6 +11041,7 @@ addMetrics(area, item);
                             fill="url(#colorSubPog)"
                             radius={[12, 12, 12, 12]}
                             maxBarSize={currentMaxBarSize}
+                            isAnimationActive={false}
                             background={<CustomBarBackground data={overviewStats.subChartData || []} activeKey={activeSubBarKey} />}
                           >
                             {(overviewStats.subChartData || []).map((entry: any, index: number) => {
@@ -11084,6 +11088,7 @@ addMetrics(area, item);
                             fill="url(#colorSubStock)"
                             radius={[12, 12, 12, 12]}
                             maxBarSize={currentMaxBarSize}
+                            isAnimationActive={false}
                             background={<CustomBarBackground data={overviewStats.subChartData || []} activeKey={activeSubBarKey} />}
                           >
                             {(overviewStats.subChartData || []).map((entry: any, index: number) => {
@@ -12460,6 +12465,7 @@ addMetrics(area, item);
                     fill="url(#colorTrendBudget)"
                     radius={[12, 12, 12, 12]}
                     maxBarSize={currentMaxBarSize}
+                    isAnimationActive={false}
                     background={<CustomBarBackground data={overviewHistoryData} activeKey={activeMainBarKey} />}
                   >
                     {overviewHistoryData.map((entry, index) => {
@@ -12506,6 +12512,7 @@ addMetrics(area, item);
                     fill="url(#colorTrendActual)"
                     radius={[12, 12, 12, 12]}
                     maxBarSize={currentMaxBarSize}
+                    isAnimationActive={false}
                     background={<CustomBarBackground data={overviewHistoryData} activeKey={activeMainBarKey} />}
                   >
                     {overviewHistoryData.map((entry, index) => {
@@ -12771,6 +12778,7 @@ addMetrics(area, item);
                           fill="url(#modalColorAreaPog)"
                           radius={[12, 12, 12, 12]}
                           maxBarSize={currentMaxBarSize}
+                          isAnimationActive={false}
                           background={<CustomBarBackground data={focusedChartType === "sub" ? overviewStats.subChartData : overviewStats.areaChartData} activeKey={focusedChartType === "sub" ? activeSubBarKey : activeMainBarKey} />}
                         >
                           {(focusedChartType === "sub" ? overviewStats.subChartData : overviewStats.areaChartData)?.map((entry: any, index: number) => {
@@ -12828,6 +12836,7 @@ addMetrics(area, item);
                           fill="url(#modalColorAreaStock)"
                           radius={[12, 12, 12, 12]}
                           maxBarSize={currentMaxBarSize}
+                          isAnimationActive={false}
                           background={<CustomBarBackground data={focusedChartType === "sub" ? overviewStats.subChartData : overviewStats.areaChartData} activeKey={focusedChartType === "sub" ? activeSubBarKey : activeMainBarKey} />}
                         >
                           {(focusedChartType === "sub" ? overviewStats.subChartData : overviewStats.areaChartData)?.map((entry: any, index: number) => {

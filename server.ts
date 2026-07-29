@@ -2754,6 +2754,17 @@ app.all("/api", async (req, res) => {
                 console.error("[getOverviewData] Failed to delete corrupted cache file:", unlinkErr);
               }
             }
+          } else {
+            const apiTestPath = path.join(process.cwd(), "api_test.json");
+            if (fs.existsSync(apiTestPath)) {
+              try {
+                const apiTestText = fs.readFileSync(apiTestPath, "utf8");
+                cachedOverviewData = JSON.parse(apiTestText);
+                console.log("[getOverviewData] Loaded fallback api_test.json into memory successfully.");
+              } catch (fallbackErr) {
+                console.warn("[getOverviewData] Error loading fallback api_test.json:", fallbackErr);
+              }
+            }
           }
         }
 
