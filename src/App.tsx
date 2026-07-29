@@ -37,8 +37,8 @@ import {
 } from "recharts";
 
 
-const ORIGINAL_SCRIPT_URL = "";
-const SCRIPT_URL = "/api";
+const ORIGINAL_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxVCPzllBhLd8J-1UWeDJteFshrCs2M2PtehcXj7mHpW3PWfAcXe1d69NSkE9j3LYnM7A/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxVCPzllBhLd8J-1UWeDJteFshrCs2M2PtehcXj7mHpW3PWfAcXe1d69NSkE9j3LYnM7A/exec";
 
 const customFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const originalFetch = window.fetch;
