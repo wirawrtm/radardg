@@ -22,7 +22,16 @@ function doGet(e) {
 }
 
 function getOverviewData() {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let ss;
+  try {
+    ss = SpreadsheetApp.getActiveSpreadsheet();
+  } catch (e) {
+    // If running as a standalone script, getActiveSpreadsheet() might throw an error.
+  }
+  if (!ss) {
+    ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  }
+  
   const sheet = ss.getSheetByName("working");
   
   if (!sheet) {
@@ -86,7 +95,7 @@ function getOverviewData() {
       sa: idx.sa !== -1 ? row[idx.sa] : "",
       bs: idx.bs !== -1 ? row[idx.bs] : "",
       activity: idx.activity !== -1 ? row[idx.activity] : "",
-      month: idx.month !== -1 ? row[idx.month] : "",
+      month: idx.month !== -1 ? (row[idx.month] instanceof Date ? formatDateToIndoString(row[idx.month]) : row[idx.month]) : "",
       budgetRp: idx.budgetRp !== -1 ? row[idx.budgetRp] : 0,
       
       "bud ADV MONTOK": idx.budAdvMontok !== -1 ? row[idx.budAdvMontok] : 0,
@@ -120,4 +129,18 @@ function getOverviewData() {
     status: "success",
     data: result
   })).setMimeType(ContentService.MimeType.JSON);
+}
+
+function formatDateToIndoString(date) {
+  const months = [
+    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+  ];
+  try {
+    const monthIndex = date.getMonth(); // 0-11
+    const year = date.getFullYear();
+    return months[monthIndex] + " " + year;
+  } catch (e) {
+    return date.toString();
+  }
 }

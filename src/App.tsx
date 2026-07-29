@@ -3658,13 +3658,7 @@ const safeNum = (val: any) => {
   useEffect(() => {
     const fetchOverview = async () => {
       try {
-        const url = "/api?action=getOverviewData";
-        const resp = await fetch(url);
-        if (!resp.ok) {
-           console.warn("Overview API not ready, using mock data");
-           setOverviewApiData([]);
-           return;
-        }
+        const resp = await customFetch("?action=getOverviewData");
         const text = await resp.text();
         try {
           const res = JSON.parse(text);
